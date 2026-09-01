@@ -3,6 +3,7 @@ import {
   deleteEntry,
   fetchAll,
   upsertCycleLogEntry,
+  upsertDailyNutrition,
   upsertEntry,
   upsertPhaseLogEntry,
   upsertSettings,
@@ -16,6 +17,8 @@ async function applyOp(op: QueueOp): Promise<void> {
       return upsertEntry(op.payload.date, op.payload.lbs)
     case 'delete_entry':
       return deleteEntry(op.payload.date)
+    case 'upsert_nutrition':
+      return upsertDailyNutrition(op.payload.date, op.payload.kcal)
     case 'upsert_phase':
       return upsertPhaseLogEntry(op.payload.start, op.payload.name)
     case 'upsert_cycle':

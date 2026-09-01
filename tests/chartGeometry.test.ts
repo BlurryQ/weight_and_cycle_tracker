@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildChartGeometry } from '../src/lib/chartGeometry'
+import { addDays } from '../src/lib/dates'
 import { fitSlope, phaseSpans, weeklyAverages, type PhaseLogEntry } from '../src/lib/math'
 import { WEIGHT_DATA_FIXTURE } from './fixtures/weight-data'
 
@@ -30,10 +31,39 @@ describe('buildChartGeometry', () => {
     expect(geo.r2).toBeCloseTo(r2, 6)
   })
 
+  it('scopes the fit to the current phase, not a trailing window that straddles a Cut/Bulk change', () => {
+    // 20 weeks bulking (+0.4/wk) then 6 weeks cutting (−0.9/wk). 2026-01-05 is a Monday.
+    const synth = Array.from({ length: 26 }, (_, i) => ({
+      monday: addDays('2026-01-05', i * 7),
+      lbs: i < 20 ? 170 + i * 0.4 : 170 + 19 * 0.4 - (i - 19) * 0.9,
+      n: 7,
+    }))
+    const spans = phaseSpans([
+      { start: '2026-01-05', name: 'Bulk' },
+      { start: synth[20].monday, name: 'Cut' },
+    ] as PhaseLogEntry[])
+    // fitK 26 = the whole window, which would otherwise blend the bulk into the cut's slope.
+    const geo = buildChartGeometry(synth, spans, { ...TODAY_CFG, showN: 26, fitK: 26 })
+    expect(geo.slope).toBeCloseTo(-0.9, 1) // the cut's rate, not a near-flat bulk+cut blend
+  })
+
   it('anchors the projection at the last actual point plus slope*weeks, not the fit intercept', () => {
     const geo = buildChartGeometry(weekly, [], TODAY_CFG)
     const lastActual = weekly[weekly.length - 1].lbs
     expect(geo.projVal).toBeCloseTo(lastActual + geo.slope * TODAY_CFG.fwd, 6)
+  })
+
+  it('joins the trend line into one object — past connector ends where the projection starts', () => {
+    const geo = buildChartGeometry(weekly, [], TODAY_CFG)
+    expect(geo.trendPast.endsWith(`L${geo.lastX.toFixed(1)} ${geo.lastY.toFixed(1)}`)).toBe(true)
+    expect(geo.proj.startsWith(`M${geo.lastX.toFixed(1)} ${geo.lastY.toFixed(1)}`)).toBe(true)
+  })
+
+  it('exposes the target line end Y so the component can draw its tick and label', () => {
+    const geo = buildChartGeometry(weekly, [], TODAY_CFG, undefined, [], -1.0)
+    expect(geo.targetProj.endsWith(` ${geo.targetProjY.toFixed(1)}`)).toBe(true)
+    const noTarget = buildChartGeometry(weekly, [], TODAY_CFG)
+    expect(noTarget.targetProjY).toBe(0)
   })
 
   it('draws one weekly dot per shown week', () => {

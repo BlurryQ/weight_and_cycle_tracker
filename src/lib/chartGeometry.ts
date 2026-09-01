@@ -34,7 +34,10 @@ export interface ChartDot {
 export interface ChartGeometry {
   line: string
   area: string
-  fit: string
+  /** Short faint connector from ~4 weeks back to the last actual point, at the fit slope —
+   * the backward half of the trend line, whose forward half is `proj`. Drawn solid and dim so
+   * it reads as one continuous line through the data, not a separate overlay. */
+  trendPast: string
   proj: string
   grid: GridLine[]
   bands: Band[]
@@ -44,6 +47,9 @@ export interface ChartGeometry {
    * — "if this continues" (`proj`) vs. "if you'd been exactly on target" (`targetProj`), so the
    * gap between them is visible. Empty string when no target rate was given. */
   targetProj: string
+  /** Y of the target line's forward end, for drawing its terminal tick and label. 0 when there
+   * is no target line. */
+  targetProjY: number
   dots: ChartDot[]
   lastX: number
   lastY: number
@@ -51,6 +57,9 @@ export interface ChartGeometry {
   projY: number
   slope: number
   r2: number
+  /** How many trailing weekly points actually fed the fit — `fitK`, or fewer when the fit was
+   * clamped to the current phase. */
+  fitWeeks: number
   projVal: number
   projDate: string
   first: number
@@ -62,12 +71,13 @@ export interface ChartGeometry {
 const EMPTY_GEOMETRY: ChartGeometry = {
   line: '',
   area: '',
-  fit: '',
+  trendPast: '',
   proj: '',
   grid: [],
   bands: [],
   markers: [],
   targetProj: '',
+  targetProjY: 0,
   dots: [],
   lastX: 0,
   lastY: 0,
@@ -75,6 +85,7 @@ const EMPTY_GEOMETRY: ChartGeometry = {
   projY: 0,
   slope: 0,
   r2: 0,
+  fitWeeks: 0,
   projVal: 0,
   projDate: '',
   first: 0,
@@ -103,16 +114,30 @@ export function buildChartGeometry(
   const slots = n - 1 + cfg.fwd
   const k = Math.min(cfg.fitK, n)
   const pts = show.map((w, i) => ({ x: i, y: convert(w.lbs) }))
-  const fit = leastSquaresFit(pts.slice(n - k))
-  const fittedAt = (i: number) => fit.intercept + fit.slope * i
-  // Anchored at the last actual point, not the regression's fitted value there — using the
-  // intercept would make a flat all-time fit project above/below current weight (real bug).
-  const projected = pts[n - 1].y + fit.slope * cfg.fwd
-  // Same anchor, but at the weekly target rate instead of the actual fit slope — "if you'd been
-  // exactly on target" for comparison against the real projection.
-  const targetProjected = targetSlopeLbs != null ? pts[n - 1].y + convert(targetSlopeLbs) * cfg.fwd : null
 
-  const allValues = pts.map((p) => p.y).concat([projected, fittedAt(n - k), fittedAt(n - 1)])
+  // Fit inside the current phase only. On wide windows the trailing `k` weeks can straddle the
+  // last Cut↔Bulk change, averaging two opposite slopes into a meaningless rate (and a
+  // misleading projection). Start the fit at whichever is later — `k` weeks back, or the
+  // current phase's first shown week — but keep at least 3 weekly points in the regression.
+  const spanStart = spans.length ? spans[spans.length - 1].start : ''
+  const spanIdx = spanStart ? show.findIndex((w) => w.monday >= spanStart) : 0
+  const fitStart = Math.max(0, Math.min(Math.max(n - k, spanIdx < 0 ? 0 : spanIdx), n - 3))
+  const fit = leastSquaresFit(pts.slice(fitStart))
+  // Everything below is anchored at the last *actual* point, not the regression's fitted value
+  // there — anchoring on the intercept kinks the line where it meets the data and misprojects a
+  // flat all-time fit above/below current weight.
+  const last = pts[n - 1].y
+  const projected = last + fit.slope * cfg.fwd
+  // Same anchor, at the weekly target rate — "if you'd been exactly on target", for comparison.
+  const targetProjected = targetSlopeLbs != null ? last + convert(targetSlopeLbs) * cfg.fwd : null
+
+  // The trend line is one object: a short faint connector back into the data, continued forward
+  // as the dashed projection. Drawn at the fit slope through the last actual point; the backward
+  // part is just long enough to visually tie it to the data (~4 weeks), not the whole fit span.
+  const trendPastStart = Math.max(0, Math.max(fitStart, n - 5))
+  const trendStartY = last + fit.slope * (trendPastStart - (n - 1))
+
+  const allValues = pts.map((p) => p.y).concat([projected, trendStartY])
   if (targetProjected != null) allValues.push(targetProjected)
   const lo = Math.min(...allValues) - 1.2
   const hi = Math.max(...allValues) + 1.2
@@ -121,14 +146,15 @@ export function buildChartGeometry(
 
   const line = pts.map((p, i) => (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p.y).toFixed(1)).join(' ')
   const area = line + ' L' + X(n - 1).toFixed(1) + ' ' + cfg.H + ' L0 ' + cfg.H + ' Z'
-  const fitPath =
-    'M' + X(n - k).toFixed(1) + ' ' + Y(fittedAt(n - k)).toFixed(1) + ' L' + X(n - 1).toFixed(1) + ' ' + Y(fittedAt(n - 1)).toFixed(1)
+  const trendPast =
+    'M' + X(trendPastStart).toFixed(1) + ' ' + Y(trendStartY).toFixed(1) + ' L' + X(n - 1).toFixed(1) + ' ' + Y(last).toFixed(1)
   const proj =
-    'M' + X(n - 1).toFixed(1) + ' ' + Y(pts[n - 1].y).toFixed(1) + ' L' + X(slots).toFixed(1) + ' ' + Y(projected).toFixed(1)
+    'M' + X(n - 1).toFixed(1) + ' ' + Y(last).toFixed(1) + ' L' + X(slots).toFixed(1) + ' ' + Y(projected).toFixed(1)
   const targetProj =
     targetProjected != null
-      ? 'M' + X(n - 1).toFixed(1) + ' ' + Y(pts[n - 1].y).toFixed(1) + ' L' + X(slots).toFixed(1) + ' ' + Y(targetProjected).toFixed(1)
+      ? 'M' + X(n - 1).toFixed(1) + ' ' + Y(last).toFixed(1) + ' L' + X(slots).toFixed(1) + ' ' + Y(targetProjected).toFixed(1)
       : ''
+  const targetProjY = targetProjected != null ? Y(targetProjected) : 0
 
   const grid: GridLine[] = []
   const gn = cfg.gridN
@@ -171,12 +197,13 @@ export function buildChartGeometry(
   return {
     line,
     area,
-    fit: fitPath,
+    trendPast,
     proj,
     grid,
     bands,
     markers,
     targetProj,
+    targetProjY,
     dots: pts.map((p, i) => ({ x: X(i), y: Y(p.y) })),
     lastX: X(n - 1),
     lastY: Y(pts[n - 1].y),
@@ -184,6 +211,7 @@ export function buildChartGeometry(
     projY: Y(projected),
     slope: fit.slope,
     r2: fit.r2,
+    fitWeeks: n - fitStart,
     projVal: projected,
     projDate: addDays(lastMonday, cfg.fwd * 7),
     first: pts[0].y,

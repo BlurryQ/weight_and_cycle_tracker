@@ -17,6 +17,7 @@ export interface SettingsPayload {
 export type QueueOp =
   | { op: 'upsert_entry'; payload: { date: string; lbs: number }; ts: number }
   | { op: 'delete_entry'; payload: { date: string }; ts: number }
+  | { op: 'upsert_nutrition'; payload: { date: string; kcal: number }; ts: number }
   | { op: 'upsert_phase'; payload: { start: string; name: TrainingPhase }; ts: number }
   | { op: 'upsert_cycle'; payload: { start: string; end: string | null }; ts: number }
   | { op: 'delete_cycle'; payload: { start: string }; ts: number }
