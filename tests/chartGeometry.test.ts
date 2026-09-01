@@ -6,8 +6,7 @@ import { WEIGHT_DATA_FIXTURE } from './fixtures/weight-data'
 
 const weekly = weeklyAverages(WEIGHT_DATA_FIXTURE)
 
-// Same demo phase log the prototype ships with, matching the Bulk-then-Cut bands visible in
-// screens/01-today.png.
+// A demo phase log with a Bulk-then-Cut shape (plus a one-week Deload) to exercise band drawing.
 const PHASE_LOG: PhaseLogEntry[] = [
   { start: '2026-01-05', name: 'Bulk' },
   { start: '2026-04-20', name: 'Cut' },

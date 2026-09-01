@@ -13,7 +13,7 @@ const PHASE_VAR: Record<CyclePhase, string> = {
   Ovulation: '--ovulation',
   Luteal: '--luteal',
 }
-// Solid-phase-token opacities for the shaded bands (see CYCLE_FEATURE.md §1).
+// Solid-phase-token opacities for the shaded bands: confirmed bands vs. predicted (future) bands.
 const BAND_ALPHA: Record<CyclePhase, number> = { Menstrual: 17, Follicular: 11, Ovulation: 20, Luteal: 17 }
 const PRED_ALPHA: Record<CyclePhase, number> = { Menstrual: 7, Follicular: 4.5, Ovulation: 8, Luteal: 7 }
 

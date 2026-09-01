@@ -23,16 +23,15 @@ import {
 } from '../src/lib/math'
 import { WEIGHT_DATA_FIXTURE } from './fixtures/weight-data'
 
-// The fixture's real-world "today" — frozen so results are deterministic and directly
-// comparable to the numbers already hand-verified against the source CSV and the design
-// screenshots (screens/01-today.png, 02-today-reach-date-mode.png).
+// A fixed "today" one day past the fixture's last entry — frozen so the rolling-window
+// results below are deterministic.
 const TODAY = '2026-08-25'
 
 describe('avg', () => {
   it('divides by the number of entries actually found in the window, not by the window size', () => {
-    expect(avg(WEIGHT_DATA_FIXTURE, 7, TODAY)).toBeCloseTo(183.367, 3)
-    expect(avg(WEIGHT_DATA_FIXTURE, 14, TODAY)).toBeCloseTo(183.892, 3)
-    expect(avg(WEIGHT_DATA_FIXTURE, 30, TODAY)).toBeCloseTo(185.028, 3)
+    expect(avg(WEIGHT_DATA_FIXTURE, 7, TODAY)).toBeCloseTo(179.133, 3)
+    expect(avg(WEIGHT_DATA_FIXTURE, 14, TODAY)).toBeCloseTo(179.585, 3)
+    expect(avg(WEIGHT_DATA_FIXTURE, 30, TODAY)).toBeCloseTo(179.8, 3)
   })
 
   it('returns null when no entries fall in the window', () => {
@@ -41,7 +40,7 @@ describe('avg', () => {
   })
 
   it('supports an offset window (used for week-over-week deltas)', () => {
-    expect(avg(WEIGHT_DATA_FIXTURE, 7, TODAY, 7)).toBeCloseTo(184.343, 3)
+    expect(avg(WEIGHT_DATA_FIXTURE, 7, TODAY, 7)).toBeCloseTo(179.971, 3)
   })
 })
 
@@ -55,12 +54,12 @@ describe('weeklyAverages', () => {
   it('means each week, including a partial current week', () => {
     const last = weekly[weekly.length - 1]
     expect(last.monday).toBe('2026-08-24')
-    expect(last.lbs).toBeCloseTo(183.4, 4)
+    expect(last.lbs).toBeCloseTo(178.2, 4)
     expect(last.n).toBe(1)
 
     const prev = weekly[weekly.length - 2]
     expect(prev.monday).toBe('2026-08-17')
-    expect(prev.lbs).toBeCloseTo(183.5429, 3)
+    expect(prev.lbs).toBeCloseTo(179.5714, 3)
     expect(prev.n).toBe(7)
   })
 })
@@ -69,8 +68,8 @@ describe('fitSlope (4-week window)', () => {
   it('matches an independently computed OLS fit over the last 4 weekly averages', () => {
     const weekly = weeklyAverages(WEIGHT_DATA_FIXTURE)
     const { slope, r2 } = fitSlope(weekly, 4)
-    expect(slope).toBeCloseTo(-0.674285714, 6)
-    expect(r2).toBeCloseTo(0.9157513975665896, 6)
+    expect(slope).toBeCloseTo(-0.631428571428566, 6)
+    expect(r2).toBeCloseTo(0.8424493316084389, 6)
   })
 })
 
@@ -218,11 +217,10 @@ describe('signColor', () => {
 })
 
 describe('Reach solver — solveByWeight', () => {
-  // Anchored on the real fixture's last weekly average (183.4) and 4-week fit slope
-  // (-0.674285714.../wk), matching screens/01-today.png (target 170.0 -> "10 Jan 2027, 20 weeks away").
+  // A fixed context: current 183.4 lb, losing 0.674285714.../wk, last weekly point on 2026-08-24.
   const ctx = { current: 183.4, slopeLbs: -0.674285714285719, lastMonday: '2026-08-24' }
 
-  it('reproduces the exact date shown in the design screenshot', () => {
+  it('solves a target weight to an exact calendar date (170.0 -> 10 Jan 2027, 20 weeks away)', () => {
     const result = solveByWeight(ctx, 170.0)
     expect(result.kind).toBe('reachable')
     if (result.kind === 'reachable') {
@@ -252,7 +250,7 @@ describe('Reach solver — solveByWeight', () => {
 describe('Reach solver — solveByDate', () => {
   const ctx = { current: 183.4, slopeLbs: -0.674285714285719, lastMonday: '2026-08-24' }
 
-  it('reproduces the design screenshot for the 7-week set-date example', () => {
+  it('projects a weight for a set date (7 weeks out -> 178.68 lb on 2026-10-12)', () => {
     const result = solveByDate(ctx, 7)
     expect(result.kind).toBe('projected')
     expect(result.weight).toBeCloseTo(178.68, 2)

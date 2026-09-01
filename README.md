@@ -16,8 +16,8 @@ Ships as a web PWA and as a native Android app via Capacitor.
 
 ## Stack
 
-- **React + Vite + TypeScript**, no router — four screens (`Today`, `Trends`, `History`, `Setup`)
-  switch on a single `screen` field in a React Context + `useReducer` store.
+- **React + Vite + TypeScript**, no router — five screens (`Today`, `Trends`, `History`, `Setup`,
+  `Cycle`) switch on a single `screen` field in a React Context + `useReducer` store.
 - **Supabase** (Postgres + email magic-link auth) for storage, with a `localStorage` cache and an
   offline write queue in front of it — logging a weigh-in works with no network and syncs when
   back online.
@@ -34,12 +34,11 @@ src/
   store/      state shape + reducer + the AppContext that wires in persistence/sync
   data/       Supabase client, offline queue, sync, auth gate
   components/ shared UI (nav, chart, entry sheet, ui primitives)
-  screens/    Today, Trends, History, Setup
-tests/        vitest, run against a fixture of 317 real weigh-ins (tests/fixtures/weight-data.ts)
+  screens/    Today, Trends, History, Setup, Cycle
+tests/        vitest, run against a synthetic 317-day weigh-in fixture (tests/fixtures/weight-data.ts)
 supabase/
-  migrations/ 0001 schema (entries, phase_log, settings + RLS), 0002/0003 one-time data imports
+  migrations/ 0001 schema (entries, phase_log, settings + RLS), 0004 cycle_log, 0005 nutrition
 android/      Capacitor-generated native project
-design_handoff_weight_tracker/   the original design spec this was built from (reference only)
 ```
 
 ## Local development
@@ -57,13 +56,13 @@ boot with no entries (log a weigh-in to get started).
 ### Database setup
 
 Run the migrations in `supabase/migrations/` in order via the Supabase SQL Editor (or the
-Supabase CLI once you're linked to a project). `0001_init.sql` creates the schema; `0002`/`0003`
-were one-time personal data imports and only need running once.
+Supabase CLI once you're linked to a project). `0001_init.sql` creates the schema; the rest add
+the cycle-log and daily-nutrition tables.
 
 ### Other scripts
 
 ```bash
-npm test     # vitest — math/chart geometry tests against the real 317-entry fixture
+npm test     # vitest — math/chart geometry tests against the synthetic weigh-in fixture
 npm run lint # oxlint
 npm run build
 ```

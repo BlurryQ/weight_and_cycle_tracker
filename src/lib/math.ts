@@ -203,8 +203,8 @@ export type ReachByDateResult =
 
 // Rounds the total day count (weeks * 7), not weeks first then * 7 — the two diverge for
 // fractional weeks (e.g. 19.87 weeks -> 139 days -> 10 Jan, vs a naive round(weeks)*7 -> 140
-// days -> 11 Jan). This is a real prototype behavior, not what the README's formula literally
-// says; verified against the "10 Jan 2027" Reach card output in screens/01-today.png.
+// days -> 11 Jan). This is deliberate, not what the README's formula literally says; the
+// Reach-solver tests pin the "10 Jan 2027" output.
 function dateAtWeeks(lastMonday: string, weeks: number): string {
   return addDays(lastMonday, Math.round(weeks * 7))
 }
