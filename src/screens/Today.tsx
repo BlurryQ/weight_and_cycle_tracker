@@ -14,6 +14,7 @@ import {
   solveByWeight,
   weeklyAverages,
 } from '../lib/math'
+import { cycleDayToday, medianCycleLength, type CyclePhase } from '../lib/cycle'
 import { useApp } from '../store/AppContext'
 import { Chip } from '../components/ui/Chip'
 import { WeightChart } from '../components/chart/WeightChart'
@@ -21,14 +22,14 @@ import { ReachCard } from '../components/entry/ReachCard'
 import { PaceRing } from './today/PaceRing'
 import { StatCards } from './today/StatCards'
 
-const SIGN_COLOR = { lime: 'var(--lime)', red: 'var(--red)', grey: 'var(--text-muted)' } as const
+const SIGN_COLOR = { lime: 'var(--cyan)', red: 'var(--red)', grey: 'var(--text-muted)' } as const
 
 const CHIP_COLORS = {
   Cut: {
-    bg: 'oklch(0.82 0.17 128 / .13)',
-    border: 'oklch(0.82 0.17 128 / .3)',
-    dot: 'var(--lime)',
-    text: 'var(--lime-text)',
+    bg: 'oklch(0.82 0.11 208 / .13)',
+    border: 'oklch(0.82 0.11 208 / .3)',
+    dot: 'var(--cyan)',
+    text: 'var(--cyan-text)',
   },
   Bulk: {
     bg: 'oklch(0.76 0.13 235 / .14)',
@@ -38,10 +39,18 @@ const CHIP_COLORS = {
   },
 }
 
+const PHASE_VAR: Record<CyclePhase, string> = {
+  Menstrual: '--menstrual',
+  Follicular: '--follicular',
+  Ovulation: '--ovulation',
+  Luteal: '--luteal',
+}
+
 export function Today() {
   const { state, dispatch } = useApp()
-  const { entries, phase, phaseStart, phaseLog, weeklyTarget, unit, solveMode, targetLbs, targetWeeks } = state
+  const { entries, phase, phaseStart, phaseLog, cycleLog, weeklyTarget, unit, solveMode, targetLbs, targetWeeks } = state
   const today = todayIso()
+  const cyc = cycleDayToday(cycleLog, today, medianCycleLength(cycleLog))
 
   if (entries.length === 0) {
     return (
@@ -55,8 +64,8 @@ export function Today() {
           style={{
             padding: '13px 20px',
             borderRadius: 999,
-            background: 'var(--lime)',
-            color: '#0b0c0b',
+            background: 'var(--cyan)',
+            color: 'var(--ink-on-accent)',
             font: '700 13px/1 "Barlow Condensed", sans-serif',
             letterSpacing: '0.18em',
             textTransform: 'uppercase',
@@ -101,7 +110,7 @@ export function Today() {
 
   return (
     <div style={{ padding: '0 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Chip
           label={`${phase} · week ${phaseWeek}`}
           bg={chipColors.bg}
@@ -110,7 +119,19 @@ export function Today() {
           textColor={chipColors.text}
           onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'setup' })}
         />
-        <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: '#5c6159' }}>{shortDate(today)}</span>
+        {cyc && (
+          <Chip
+            label={`Day ${cyc.day} · ${cyc.phase}`}
+            bg={`color-mix(in oklch, var(${PHASE_VAR[cyc.phase]}) 16%, transparent)`}
+            border={`color-mix(in oklch, var(${PHASE_VAR[cyc.phase]}) 38%, transparent)`}
+            dotColor={`color-mix(in oklch, var(${PHASE_VAR[cyc.phase]}) 82%, white)`}
+            textColor={`color-mix(in oklch, var(${PHASE_VAR[cyc.phase]}) 84%, white)`}
+            onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'cycle' })}
+          />
+        )}
+        <span style={{ marginLeft: 'auto', font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-faint)' }}>
+          {shortDate(today)}
+        </span>
       </div>
 
       <div style={{ marginTop: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -172,7 +193,7 @@ export function Today() {
           <button
             type="button"
             onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'trends' })}
-            style={{ font: '500 10.5px "IBM Plex Mono", monospace', color: 'var(--lime)', cursor: 'pointer' }}
+            style={{ font: '500 10.5px "IBM Plex Mono", monospace', color: 'var(--cyan)', cursor: 'pointer' }}
           >
             all trends →
           </button>

@@ -7,10 +7,18 @@ interface SegmentedControlProps<T extends string | number> {
   options: SegmentedOption<T>[]
   value: T
   onChange: (value: T) => void
+  /** Active-pill fill. Defaults to the cyan accent; the Cycle screen passes --ovulation. */
+  accent?: string
 }
 
-/** The pill-track segmented control used for unit, trend window, trend horizon, and Reach mode. */
-export function SegmentedControl<T extends string | number>({ options, value, onChange }: SegmentedControlProps<T>) {
+/** The pill-track segmented control used for unit, trend window, trend horizon, Reach mode, and
+ * the Cycle range control. */
+export function SegmentedControl<T extends string | number>({
+  options,
+  value,
+  onChange,
+  accent = 'var(--cyan)',
+}: SegmentedControlProps<T>) {
   return (
     <div
       style={{
@@ -32,8 +40,8 @@ export function SegmentedControl<T extends string | number>({ options, value, on
               flex: 1,
               padding: '6px 12px',
               borderRadius: 999,
-              background: active ? 'var(--lime)' : 'transparent',
-              color: active ? '#0b0c0b' : 'var(--text-dim)',
+              background: active ? accent : 'transparent',
+              color: active ? 'var(--ink-on-accent)' : 'var(--text-dim)',
               font: '600 10px/1 "Barlow Condensed", sans-serif',
               letterSpacing: '0.14em',
               textTransform: 'uppercase',

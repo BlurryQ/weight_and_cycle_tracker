@@ -1,21 +1,25 @@
-import type { Entry, PhaseLogEntry, PhaseName } from '../lib/math'
+import type { Entry, PhaseLogEntry, TrainingPhase } from '../lib/math'
+import type { CycleLogEntry } from '../lib/cycle'
 
-export type Screen = 'today' | 'trends' | 'history' | 'setup'
+export type Screen = 'today' | 'trends' | 'cycle' | 'history' | 'setup'
 export type Unit = 'lb' | 'kg'
 export type SolveMode = 'weight' | 'date'
 export type TrendWindow = 8 | 13 | 26 | 99
 export type TrendHorizon = 4 | 6 | 12
+export type CycleWindow = 8 | 13 | 26
 
 /** State persisted to local cache and, once synced, to Supabase. */
 export interface PersistedState {
   entries: Entry[]
-  phase: PhaseName
+  phase: TrainingPhase
   phaseStart: string
   phaseLog: PhaseLogEntry[]
+  cycleLog: CycleLogEntry[]
   weeklyTarget: number
   unit: Unit
   trendWindow: TrendWindow
   trendHorizon: TrendHorizon
+  cycleWindow: CycleWindow
   solveMode: SolveMode
   targetLbs: number
   targetWeeks: number
@@ -44,10 +48,12 @@ export const PERSISTED_KEYS: (keyof PersistedState)[] = [
   'phase',
   'phaseStart',
   'phaseLog',
+  'cycleLog',
   'weeklyTarget',
   'unit',
   'trendWindow',
   'trendHorizon',
+  'cycleWindow',
   'solveMode',
   'targetLbs',
   'targetWeeks',
@@ -60,10 +66,12 @@ export function initialState(): AppState {
     phase: 'Cut',
     phaseStart: today,
     phaseLog: [{ start: today, name: 'Cut' }],
+    cycleLog: [],
     weeklyTarget: -1.0,
     unit: 'lb',
     trendWindow: 26,
     trendHorizon: 6,
+    cycleWindow: 13,
     solveMode: 'weight',
     targetLbs: 175,
     targetWeeks: 6,

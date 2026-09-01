@@ -9,9 +9,11 @@ interface WeightChartProps {
   variant: 'today' | 'trends'
 }
 
-const CUT_FILL = 'oklch(0.82 0.17 128 / .05)'
-const CUT_EDGE = 'oklch(0.82 0.17 128 / .22)'
-const CUT_LABEL = 'oklch(0.7 0.12 128)'
+// Band fills / edges are the --cyan and --blue tokens at low alpha; the labels are the solid
+// tokens. Keep these in sync with :root so the Cut/Bulk shading matches its swatch colour.
+const CUT_FILL = 'oklch(0.82 0.11 208 / .05)'
+const CUT_EDGE = 'oklch(0.82 0.11 208 / .22)'
+const CUT_LABEL = 'oklch(0.86 0.09 208)'
 const BULK_FILL = 'oklch(0.76 0.13 235 / .07)'
 const BULK_EDGE = 'oklch(0.76 0.13 235 / .28)'
 const BULK_LABEL = 'oklch(0.76 0.13 235)'
@@ -63,8 +65,8 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
       <svg width={W} height={H} style={{ overflow: 'visible', display: 'block' }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--lime)" stopOpacity={isTrends ? 0.15 : 0.16} />
-            <stop offset="100%" stopColor="var(--lime)" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--cyan)" stopOpacity={isTrends ? 0.15 : 0.16} />
+            <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
           </linearGradient>
         </defs>
 
@@ -102,7 +104,7 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
 
         <path d={g.fit} fill="none" stroke="var(--text-muted)" strokeWidth={1} strokeDasharray="5 4" />
 
-        <path d={g.line} fill="none" stroke="var(--lime)" strokeWidth={2.1} strokeLinejoin="round" />
+        <path d={g.line} fill="none" stroke="var(--cyan)" strokeWidth={2.1} strokeLinejoin="round" />
 
         {g.targetProj && (
           <path
@@ -119,7 +121,7 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
         <path
           d={g.proj}
           fill="none"
-          stroke="var(--lime)"
+          stroke="var(--cyan)"
           strokeWidth={2}
           strokeDasharray="2 5"
           strokeLinecap="round"
@@ -128,16 +130,16 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
 
         {isTrends &&
           g.dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r={2.4} fill="var(--bg)" stroke="var(--lime)" strokeWidth={1.2} />
+            <circle key={i} cx={d.x} cy={d.y} r={2.4} fill="var(--bg)" stroke="var(--cyan)" strokeWidth={1.2} />
           ))}
 
-        <circle cx={g.lastX} cy={g.lastY} r={4.5} fill="var(--lime)" />
+        <circle cx={g.lastX} cy={g.lastY} r={4.5} fill="var(--cyan)" />
         <circle
           cx={g.projX}
           cy={g.projY}
           r={3.5}
-          fill={isTrends ? 'var(--lime)' : 'var(--bg)'}
-          stroke="var(--lime)"
+          fill={isTrends ? 'var(--cyan)' : 'var(--bg)'}
+          stroke="var(--cyan)"
           strokeWidth={1.6}
         />
       </svg>

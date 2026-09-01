@@ -1,13 +1,14 @@
-import type { PhaseName } from '../lib/math'
-import type { SolveMode, TrendHorizon, TrendWindow, Unit } from '../store/types'
+import type { TrainingPhase } from '../lib/math'
+import type { CycleWindow, SolveMode, TrendHorizon, TrendWindow, Unit } from '../store/types'
 
 export interface SettingsPayload {
-  phase: PhaseName
+  phase: TrainingPhase
   phaseStart: string
   weeklyTarget: number
   unit: Unit
   trendWindow: TrendWindow
   trendHorizon: TrendHorizon
+  cycleWindow: CycleWindow
   solveMode: SolveMode
   targetLbs: number
   targetWeeks: number
@@ -16,7 +17,9 @@ export interface SettingsPayload {
 export type QueueOp =
   | { op: 'upsert_entry'; payload: { date: string; lbs: number }; ts: number }
   | { op: 'delete_entry'; payload: { date: string }; ts: number }
-  | { op: 'upsert_phase'; payload: { start: string; name: PhaseName }; ts: number }
+  | { op: 'upsert_phase'; payload: { start: string; name: TrainingPhase }; ts: number }
+  | { op: 'upsert_cycle'; payload: { start: string; end: string | null }; ts: number }
+  | { op: 'delete_cycle'; payload: { start: string }; ts: number }
   | { op: 'upsert_settings'; payload: SettingsPayload; ts: number }
 
 const QUEUE_KEY = 'wt.queue'

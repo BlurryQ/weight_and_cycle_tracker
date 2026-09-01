@@ -4,8 +4,10 @@ import { AppProvider, useApp } from './store/AppContext'
 import { TabBar } from './components/nav/TabBar'
 import { Toast } from './components/nav/Toast'
 import { EntrySheet } from './components/entry/EntrySheet'
+import { PeriodSheet } from './components/entry/PeriodSheet'
 import { Today } from './screens/Today'
 import { Trends } from './screens/Trends'
+import { Cycle } from './screens/Cycle'
 import { History } from './screens/History'
 import { Setup } from './screens/Setup'
 import { today as todayIso } from './lib/dates'
@@ -37,6 +39,7 @@ function Shell() {
           <div style={{ flex: '1 0 auto', paddingTop: 'max(20px, env(safe-area-inset-top))' }}>
             {state.screen === 'today' && <Today />}
             {state.screen === 'trends' && <Trends />}
+            {state.screen === 'cycle' && <Cycle />}
             {state.screen === 'history' && <History />}
             {state.screen === 'setup' && <Setup />}
           </div>
@@ -46,12 +49,15 @@ function Shell() {
           <TabBar
             active={state.screen}
             onSelect={(screen) => dispatch({ type: 'SET_SCREEN', screen })}
-            onFab={() => dispatch({ type: 'OPEN_SHEET', sheet: todayIso() })}
+            onFab={() =>
+              dispatch({ type: 'OPEN_SHEET', sheet: state.screen === 'cycle' ? 'period' : todayIso() })
+            }
           />
         </div>
       </div>
 
       <EntrySheet />
+      <PeriodSheet />
     </>
   )
 }

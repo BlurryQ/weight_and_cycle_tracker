@@ -20,7 +20,7 @@ import { WeightChart } from '../components/chart/WeightChart'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 
 const SIGN_COLOR: Record<SignColor, string> = {
-  lime: 'var(--lime)',
+  lime: 'var(--cyan)',
   red: 'var(--red)',
   grey: 'var(--text-muted)',
 }
@@ -110,7 +110,7 @@ export function Trends() {
 
       <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-          <span style={{ font: '700 20px/1 "Barlow Condensed", sans-serif', color: 'var(--lime)' }}>{streak}</span>
+          <span style={{ font: '700 20px/1 "Barlow Condensed", sans-serif', color: 'var(--cyan)' }}>{streak}</span>
           <span style={{ font: '500 9px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
             day{streak === 1 ? '' : 's'} streak
           </span>

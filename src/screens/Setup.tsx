@@ -1,11 +1,11 @@
 import { dayLabel, diffDays, mondayOf, today as todayIso } from '../lib/dates'
 import { sgn, toDisplay, toLbs, unitLabel } from '../lib/format'
-import { currentDir, type PhaseName } from '../lib/math'
+import { currentDir, type TrainingPhase } from '../lib/math'
 import { useApp } from '../store/AppContext'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 import { Stepper } from '../components/ui/Stepper'
 
-const PHASES: { name: PhaseName; hint: string }[] = [
+const PHASES: { name: TrainingPhase; hint: string }[] = [
   { name: 'Cut', hint: 'deficit, lose steady' },
   { name: 'Bulk', hint: 'surplus, gain slow' },
   { name: 'Maintain', hint: 'hold — folds into phase' },
@@ -71,8 +71,8 @@ export function Setup() {
                   cursor: 'pointer',
                   padding: '13px 14px',
                   borderRadius: 14,
-                  background: selected ? 'oklch(0.82 0.17 128 / .12)' : 'var(--surface)',
-                  border: selected ? '1.5px solid var(--lime)' : '1.5px solid var(--surface)',
+                  background: selected ? 'oklch(0.82 0.11 208 / .12)' : 'var(--surface)',
+                  border: selected ? '1.5px solid var(--cyan)' : '1.5px solid var(--surface)',
                   textAlign: 'left',
                 }}
               >
@@ -81,7 +81,7 @@ export function Setup() {
                     font: '700 16px/1.2 "Barlow Condensed", sans-serif',
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    color: selected ? 'var(--lime-text)' : 'var(--text-secondary)',
+                    color: selected ? 'var(--cyan-text)' : 'var(--text-secondary)',
                   }}
                 >
                   {p.name}
@@ -98,7 +98,7 @@ export function Setup() {
       <div style={{ marginTop: 20, padding: '14px 15px', borderRadius: 14, background: 'var(--surface)' }}>
         {sectionLabel('Weekly target')}
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ font: '700 25px/1 "Barlow Condensed", sans-serif', color: 'var(--lime)' }}>
+          <span style={{ font: '700 25px/1 "Barlow Condensed", sans-serif', color: 'var(--cyan)' }}>
             {sgn(toDisplay(weeklyTarget, unit), 2)} {unitLabel(unit)}/wk
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>

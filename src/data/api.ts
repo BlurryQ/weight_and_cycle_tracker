@@ -1,10 +1,12 @@
 import type { Entry, PhaseLogEntry } from '../lib/math'
+import type { CycleLogEntry } from '../lib/cycle'
 import { supabase, supabaseConfigured } from './supabaseClient'
 import type { SettingsPayload } from './queue'
 
 export interface RemoteSnapshot {
   entries: Entry[]
   phaseLog: PhaseLogEntry[]
+  cycleLog: CycleLogEntry[]
   settings: SettingsPayload | null
 }
 
@@ -31,6 +33,18 @@ export async function upsertPhaseLogEntry(start: string, name: PhaseLogEntry['na
   if (error) throw error
 }
 
+export async function upsertCycleLogEntry(start: string, end: string | null): Promise<void> {
+  if (!supabaseConfigured) return
+  const { error } = await supabase.from('cycle_log').upsert({ start, end_date: end }, { onConflict: 'user_id,start' })
+  if (error) throw error
+}
+
+export async function deleteCycleLogEntry(start: string): Promise<void> {
+  if (!supabaseConfigured) return
+  const { error } = await supabase.from('cycle_log').delete().eq('start', start)
+  if (error) throw error
+}
+
 export async function upsertSettings(settings: SettingsPayload): Promise<void> {
   if (!supabaseConfigured) return
   const { error } = await supabase.from('settings').upsert(
@@ -41,6 +55,7 @@ export async function upsertSettings(settings: SettingsPayload): Promise<void> {
       unit: settings.unit,
       trend_window: settings.trendWindow,
       trend_horizon: settings.trendHorizon,
+      cycle_window: settings.cycleWindow,
       solve_mode: settings.solveMode,
       target_lbs: settings.targetLbs,
       target_weeks: settings.targetWeeks,
@@ -57,13 +72,15 @@ export async function fetchAll(): Promise<RemoteSnapshot | null> {
   const session = await requireSession()
   if (!session) return null
 
-  const [entriesRes, phaseLogRes, settingsRes] = await Promise.all([
+  const [entriesRes, phaseLogRes, cycleLogRes, settingsRes] = await Promise.all([
     supabase.from('entries').select('date, lbs').order('date', { ascending: true }),
     supabase.from('phase_log').select('start, name').order('start', { ascending: true }),
+    supabase.from('cycle_log').select('start, end_date').order('start', { ascending: true }),
     supabase.from('settings').select('*').maybeSingle(),
   ])
   if (entriesRes.error) throw entriesRes.error
   if (phaseLogRes.error) throw phaseLogRes.error
+  if (cycleLogRes.error) throw cycleLogRes.error
   if (settingsRes.error) throw settingsRes.error
 
   const settingsRow = settingsRes.data
@@ -75,6 +92,7 @@ export async function fetchAll(): Promise<RemoteSnapshot | null> {
         unit: settingsRow.unit,
         trendWindow: settingsRow.trend_window,
         trendHorizon: settingsRow.trend_horizon,
+        cycleWindow: settingsRow.cycle_window ?? 13,
         solveMode: settingsRow.solve_mode,
         targetLbs: settingsRow.target_lbs,
         targetWeeks: settingsRow.target_weeks,
@@ -84,6 +102,7 @@ export async function fetchAll(): Promise<RemoteSnapshot | null> {
   return {
     entries: (entriesRes.data ?? []).map((r) => ({ date: r.date, lbs: r.lbs })),
     phaseLog: (phaseLogRes.data ?? []).map((r) => ({ start: r.start, name: r.name })),
+    cycleLog: (cycleLogRes.data ?? []).map((r) => ({ start: r.start, ...(r.end_date ? { end: r.end_date } : {}) })),
     settings,
   }
 }

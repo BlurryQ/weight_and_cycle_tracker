@@ -3,7 +3,7 @@ import type { Unit } from '../../store/types'
 import type { SignColor } from '../../lib/math'
 
 const SIGN_COLOR: Record<SignColor, string> = {
-  lime: 'var(--lime)',
+  lime: 'var(--cyan)',
   red: 'var(--red)',
   grey: 'var(--text-muted)',
 }

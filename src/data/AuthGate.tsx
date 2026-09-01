@@ -82,7 +82,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
           color: 'var(--text-primary)',
         }}
       >
-        Weight Tracker
+        Weight &amp; Cycle Tracker
       </div>
       {status === 'link-sent' ? (
         <p style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-muted)', maxWidth: 280 }}>
@@ -109,8 +109,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
             style={{
               padding: '13px 0',
               borderRadius: 999,
-              background: 'var(--lime)',
-              color: '#0b0c0b',
+              background: 'var(--cyan)',
+              color: 'var(--ink-on-accent)',
               font: '700 13px/1 "Barlow Condensed", sans-serif',
               letterSpacing: '0.18em',
               textTransform: 'uppercase',

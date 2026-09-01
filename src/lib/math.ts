@@ -11,12 +11,12 @@ export interface WeeklyAverage {
   n: number
 }
 
-export type PhaseName = 'Cut' | 'Bulk' | 'Maintain' | 'Deload'
+export type TrainingPhase = 'Cut' | 'Bulk' | 'Maintain' | 'Deload'
 export type Direction = 'Cut' | 'Bulk'
 
 export interface PhaseLogEntry {
   start: string
-  name: PhaseName
+  name: TrainingPhase
 }
 
 export interface PhaseSpan {
@@ -107,7 +107,7 @@ export interface PhaseAt {
   /** Folded Cut/Bulk direction in effect for that week (used for the History phase tag). */
   dir: Direction | null
   /** The raw phase name in effect (used for the History detail line, e.g. "Deload · 7 of 7 days"). */
-  raw: PhaseName | null
+  raw: TrainingPhase | null
 }
 
 /** Which phase was in effect for a given ISO Monday, both the folded Cut/Bulk direction and
@@ -129,7 +129,7 @@ export function phaseAt(monday: string, log: PhaseLogEntry[]): PhaseAt {
 /** The direction (Cut/Bulk) the phase-aware sign rule should use: the current phase if it's
  * Cut/Bulk, otherwise the direction of the enclosing span (Maintain/Deload fold-in), defaulting
  * to Cut if there's no span history at all. */
-export function currentDir(phase: PhaseName, log: PhaseLogEntry[]): Direction {
+export function currentDir(phase: TrainingPhase, log: PhaseLogEntry[]): Direction {
   const d = dirOf(phase)
   if (d) return d
   const spans = phaseSpans(log)

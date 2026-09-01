@@ -19,7 +19,7 @@ export function Toast({ message, onDismiss }: ToastProps) {
     <div
       style={{
         position: 'sticky',
-        bottom: 92,
+        bottom: 'calc(92px + env(safe-area-inset-bottom))',
         display: 'flex',
         justifyContent: 'center',
         pointerEvents: 'none',
@@ -29,7 +29,7 @@ export function Toast({ message, onDismiss }: ToastProps) {
       <span
         style={{
           font: '500 10.5px "IBM Plex Mono", monospace',
-          color: 'var(--lime)',
+          color: 'var(--cyan)',
           background: 'var(--surface)',
           padding: '8px 14px',
           borderRadius: 999,

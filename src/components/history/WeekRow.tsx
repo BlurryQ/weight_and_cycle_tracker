@@ -4,7 +4,7 @@ import type { Entry, PhaseAt, SignColor } from '../../lib/math'
 import type { Unit } from '../../store/types'
 
 const SIGN_COLOR: Record<SignColor, string> = {
-  lime: 'var(--lime)',
+  lime: 'var(--cyan)',
   red: 'var(--red)',
   grey: 'var(--text-muted)',
 }
@@ -70,7 +70,7 @@ export function WeekRow({
               font: '600 8.5px/1 "Barlow Condensed", sans-serif',
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: phase.dir === 'Bulk' ? 'var(--blue)' : 'oklch(0.7 0.12 128)',
+              color: phase.dir === 'Bulk' ? 'var(--blue)' : 'var(--cyan-text)',
             }}
           >
             {phase.dir}
@@ -79,7 +79,7 @@ export function WeekRow({
         <span style={{ flex: 1, textAlign: 'right', font: '500 11.5px "IBM Plex Mono", monospace', color: hasPrev ? SIGN_COLOR[signColorOf(deltaLbs ?? 0)] : 'var(--text-muted)' }}>
           {hasPrev ? sgn(toDisplay(deltaLbs ?? 0, unit)) : '—'}
         </span>
-        <span style={{ font: '500 9px/1 "IBM Plex Mono", monospace', color: '#3f443e', width: 14, textAlign: 'right' }}>
+        <span style={{ font: '500 9px/1 "IBM Plex Mono", monospace', color: 'var(--text-faint)', width: 14, textAlign: 'right' }}>
           {open ? '▾' : '▸'}
         </span>
       </button>
@@ -106,8 +106,8 @@ export function WeekRow({
                 font: '600 9.5px/1 "Barlow Condensed", sans-serif',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: '#0b0c0b',
-                background: 'var(--lime)',
+                color: 'var(--ink-on-accent)',
+                background: 'var(--cyan)',
                 padding: '5px 10px',
                 borderRadius: 999,
                 cursor: 'pointer',
@@ -126,7 +126,7 @@ export function WeekRow({
                 key={date}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}
               >
-                <span style={{ width: 40, font: '500 13px "IBM Plex Mono", monospace', color: isToday ? 'var(--lime)' : 'var(--text-dim)' }}>
+                <span style={{ width: 40, font: '500 13px "IBM Plex Mono", monospace', color: isToday ? 'var(--cyan)' : 'var(--text-dim)' }}>
                   {dn}
                 </span>
                 <span style={{ flex: 1, font: '500 13px "IBM Plex Mono", monospace', color: entry ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
@@ -138,7 +138,7 @@ export function WeekRow({
                     onClick={() => onEditDay(date)}
                     style={{
                       font: '500 11px "IBM Plex Mono", monospace',
-                      color: 'var(--lime)',
+                      color: 'var(--cyan)',
                       opacity: 0.75,
                       cursor: 'pointer',
                       paddingRight: 10, // matches the Copy pill's own inset so the text lines up

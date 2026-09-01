@@ -13,6 +13,7 @@ function settingsFrom(state: AppState): SettingsPayload {
     unit: state.unit,
     trendWindow: state.trendWindow,
     trendHorizon: state.trendHorizon,
+    cycleWindow: state.cycleWindow,
     solveMode: state.solveMode,
     targetLbs: state.targetLbs,
     targetWeeks: state.targetWeeks,
@@ -24,6 +25,7 @@ const SETTINGS_ACTION_TYPES = new Set<Action['type']>([
   'SET_UNIT',
   'SET_TREND_WINDOW',
   'SET_TREND_HORIZON',
+  'SET_CYCLE_WINDOW',
   'SET_SOLVE_MODE',
   'SET_TARGET_LBS',
   'SAVE_TARGET',
@@ -50,6 +52,15 @@ function queueSideEffects(action: Action, next: AppState) {
       enqueue({ op: 'upsert_settings', payload: settingsFrom(next) })
       break
     }
+    case 'LOG_PERIOD_START':
+    case 'LOG_PERIOD_END': {
+      const touched = next.cycleLog.find((c) => c.start === action.date) ?? next.cycleLog.find((c) => c.end === action.date)
+      if (touched) enqueue({ op: 'upsert_cycle', payload: { start: touched.start, end: touched.end ?? null } })
+      break
+    }
+    case 'DELETE_CYCLE':
+      enqueue({ op: 'delete_cycle', payload: { start: action.start } })
+      break
     default:
       if (SETTINGS_ACTION_TYPES.has(action.type)) {
         enqueue({ op: 'upsert_settings', payload: settingsFrom(next) })
@@ -102,6 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         state: {
           entries: remote.entries,
           phaseLog: remote.phaseLog,
+          cycleLog: remote.cycleLog,
           ...(remote.settings ?? {}),
         },
       })

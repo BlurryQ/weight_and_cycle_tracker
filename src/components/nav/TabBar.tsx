@@ -4,6 +4,7 @@ import { Fab } from './Fab'
 const TABS: { id: Screen; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'trends', label: 'Trends' },
+  { id: 'cycle', label: 'Cycle' },
   { id: 'history', label: 'History' },
   { id: 'setup', label: 'Setup' },
 ]
@@ -15,6 +16,7 @@ interface TabBarProps {
 }
 
 export function TabBar({ active, onSelect, onFab }: TabBarProps) {
+  const onCycle = active === 'cycle'
   return (
     <div
       style={{
@@ -22,11 +24,13 @@ export function TabBar({ active, onSelect, onFab }: TabBarProps) {
         bottom: 0,
         left: 0,
         right: 0,
-        background: 'linear-gradient(to bottom, rgba(11,12,11,0) 0%, #0b0c0b 34%)',
+        background: 'linear-gradient(to bottom, transparent 0%, var(--bg) 34%)',
         paddingTop: 24,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 6px 30px' }}>
+      {/* Bottom padding clears the Android gesture / 3-button nav bar (the app runs edge-to-edge
+          on Android 15+, so content otherwise renders underneath it). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 6px calc(30px + env(safe-area-inset-bottom))' }}>
         {TABS.map((tab) => {
           const isActive = tab.id === active
           return (
@@ -50,13 +54,13 @@ export function TabBar({ active, onSelect, onFab }: TabBarProps) {
                   width: 16,
                   height: 3,
                   borderRadius: 999,
-                  background: isActive ? 'var(--lime)' : 'transparent',
+                  background: isActive ? (tab.id === 'cycle' ? 'var(--ovulation)' : 'var(--cyan)') : 'transparent',
                 }}
               />
               <span
                 style={{
                   font: '600 10px/1 "Barlow Condensed", sans-serif',
-                  letterSpacing: '0.14em',
+                  letterSpacing: '0.12em',
                   textTransform: 'uppercase',
                   color: isActive ? 'var(--text-primary)' : 'var(--text-dim)',
                 }}
@@ -66,7 +70,7 @@ export function TabBar({ active, onSelect, onFab }: TabBarProps) {
             </button>
           )
         })}
-        <Fab onClick={onFab} />
+        <Fab variant={onCycle ? 'period' : 'weight'} onClick={onFab} />
       </div>
     </div>
   )

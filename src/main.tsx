@@ -9,7 +9,7 @@ import App from './App.tsx'
 if (Capacitor.isNativePlatform()) {
   void Promise.all([import('@capacitor/status-bar')]).then(([{ StatusBar, Style }]) => {
     void StatusBar.setStyle({ style: Style.Dark })
-    void StatusBar.setBackgroundColor({ color: '#0b0c0b' })
+    void StatusBar.setBackgroundColor({ color: '#0e1013' })
   })
 }
 

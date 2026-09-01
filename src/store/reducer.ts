@@ -1,8 +1,9 @@
 import { addDays, mondayOf, today as todayIso } from '../lib/dates'
 import { applyKeypadKey, toDisplay } from '../lib/format'
 import { dedupePhaseLog } from '../lib/math'
-import type { AppState, PersistedState, Screen, SolveMode, TrendHorizon, TrendWindow, Unit } from './types'
-import type { PhaseName } from '../lib/math'
+import type { AppState, CycleWindow, PersistedState, Screen, SolveMode, TrendHorizon, TrendWindow, Unit } from './types'
+import type { TrainingPhase } from '../lib/math'
+import type { CycleLogEntry } from '../lib/cycle'
 
 export type Action =
   | { type: 'SET_SCREEN'; screen: Screen }
@@ -11,13 +12,17 @@ export type Action =
   | { type: 'TAP_KEY'; key: string }
   | { type: 'SAVE_ENTRY'; date: string; lbs: number }
   | { type: 'DELETE_ENTRY'; date: string }
-  | { type: 'SET_PHASE'; phase: PhaseName }
+  | { type: 'SET_PHASE'; phase: TrainingPhase }
   | { type: 'RESTART_PHASE' }
   | { type: 'SET_PHASE_WEEK'; week: number }
   | { type: 'SET_WEEKLY_TARGET'; value: number }
   | { type: 'SET_UNIT'; unit: Unit }
   | { type: 'SET_TREND_WINDOW'; window: TrendWindow }
   | { type: 'SET_TREND_HORIZON'; horizon: TrendHorizon }
+  | { type: 'SET_CYCLE_WINDOW'; window: CycleWindow }
+  | { type: 'LOG_PERIOD_START'; date: string }
+  | { type: 'LOG_PERIOD_END'; date: string }
+  | { type: 'DELETE_CYCLE'; start: string }
   | { type: 'TOGGLE_WEEK'; monday: string }
   | { type: 'SET_SOLVE_MODE'; mode: SolveMode }
   | { type: 'SET_TARGET_LBS'; value: number }
@@ -28,8 +33,12 @@ export type Action =
   | { type: 'HYDRATE'; state: Partial<PersistedState> }
   | { type: 'SET_SYNC_FAILED'; failed: boolean }
 
-function withPhaseLogAppend(phaseLog: AppState['phaseLog'], start: string, name: PhaseName) {
+function withPhaseLogAppend(phaseLog: AppState['phaseLog'], start: string, name: TrainingPhase) {
   return dedupePhaseLog([...phaseLog, { start, name }])
+}
+
+function sortCycleLog(log: CycleLogEntry[]): CycleLogEntry[] {
+  return [...log].sort((a, b) => (a.start < b.start ? -1 : 1))
 }
 
 export function reducer(state: AppState, action: Action): AppState {
@@ -123,6 +132,32 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_TREND_HORIZON':
       return { ...state, trendHorizon: action.horizon }
+
+    case 'SET_CYCLE_WINDOW':
+      return { ...state, cycleWindow: action.window }
+
+    case 'LOG_PERIOD_START': {
+      // The start date is the natural key — logging the same day twice is a no-op, so a
+      // double-tap of "period started today" is idempotent.
+      if (state.cycleLog.some((c) => c.start === action.date)) return state
+      return { ...state, cycleLog: sortCycleLog([...state.cycleLog, { start: action.date }]) }
+    }
+
+    case 'LOG_PERIOD_END': {
+      // Attach the end to the most recent start that is on or before it and still open
+      // (or already ended earlier). An end before any start is rejected.
+      const open = [...state.cycleLog]
+        .filter((c) => c.start <= action.date)
+        .sort((a, b) => (a.start < b.start ? 1 : -1))[0]
+      if (!open) return state
+      return {
+        ...state,
+        cycleLog: sortCycleLog(state.cycleLog.map((c) => (c.start === open.start ? { ...c, end: action.date } : c))),
+      }
+    }
+
+    case 'DELETE_CYCLE':
+      return { ...state, cycleLog: state.cycleLog.filter((c) => c.start !== action.start) }
 
     case 'TOGGLE_WEEK':
       return { ...state, openWeek: state.openWeek === action.monday ? null : action.monday }

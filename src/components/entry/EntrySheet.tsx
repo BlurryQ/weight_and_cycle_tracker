@@ -8,7 +8,7 @@ export function EntrySheet() {
   const { state, dispatch } = useApp()
   const { sheet, keypadValue, entries, unit } = state
 
-  if (!sheet) return null
+  if (!sheet || sheet === 'period') return null // 'period' is handled by PeriodSheet
   const sheetKey: string = sheet // narrowed once, non-null — safe to close over in nested handlers below
 
   const today = todayIso()
@@ -73,7 +73,7 @@ export function EntrySheet() {
           maxWidth: 430,
           background: 'var(--surface)',
           borderRadius: '26px 26px 0 0',
-          padding: '14px 20px 34px',
+          padding: '14px 20px calc(34px + env(safe-area-inset-bottom))',
         }}
       >
         <div style={{ width: 38, height: 4, borderRadius: 3, background: 'var(--chart-marker)', margin: '0 auto 14px' }} />
@@ -100,7 +100,7 @@ export function EntrySheet() {
             padding: '14px 16px 16px',
             borderRadius: 14,
             background: 'var(--bg)',
-            border: '1.5px solid var(--lime)',
+            border: '1.5px solid var(--cyan)',
           }}
         >
           <div
@@ -127,7 +127,7 @@ export function EntrySheet() {
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>{hint}</span>
           {canDelete && (
-            <button type="button" onClick={remove} style={{ font: '500 10px "IBM Plex Mono", monospace', color: '#8a6a6a', cursor: 'pointer' }}>
+            <button type="button" onClick={remove} style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'oklch(0.62 0.09 12)', cursor: 'pointer' }}>
               clear this day
             </button>
           )}
@@ -144,8 +144,8 @@ export function EntrySheet() {
             width: '100%',
             padding: '15px 0',
             borderRadius: 999,
-            background: hasValue ? 'var(--lime)' : 'var(--raised)',
-            color: hasValue ? '#0b0c0b' : 'var(--text-dim)',
+            background: hasValue ? 'var(--cyan)' : 'var(--raised)',
+            color: hasValue ? 'var(--ink-on-accent)' : 'var(--text-dim)',
             font: '700 13px/1 "Barlow Condensed", sans-serif',
             letterSpacing: '0.18em',
             textTransform: 'uppercase',

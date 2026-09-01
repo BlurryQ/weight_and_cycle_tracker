@@ -69,3 +69,36 @@ describe('reducer — TAP_KEY (keypad overtype)', () => {
     expect(emptyDay.keypadPristine).toBe(false)
   })
 })
+
+describe('reducer — cycle logging', () => {
+  it('LOG_PERIOD_START adds a start, sorted, and is idempotent', () => {
+    const s0 = initialState()
+    const s1 = reducer(s0, { type: 'LOG_PERIOD_START', date: '2026-08-11' })
+    const s2 = reducer(s1, { type: 'LOG_PERIOD_START', date: '2026-07-14' })
+    expect(s2.cycleLog.map((c) => c.start)).toEqual(['2026-07-14', '2026-08-11'])
+
+    const s3 = reducer(s2, { type: 'LOG_PERIOD_START', date: '2026-08-11' })
+    expect(s3).toBe(s2) // same reference — logging the same start twice is a no-op
+  })
+
+  it('LOG_PERIOD_END attaches the end to the most recent start on or before it', () => {
+    const base = {
+      ...initialState(),
+      cycleLog: [{ start: '2026-07-14' }, { start: '2026-08-11' }],
+    }
+    const next = reducer(base, { type: 'LOG_PERIOD_END', date: '2026-08-15' })
+    expect(next.cycleLog).toEqual([{ start: '2026-07-14' }, { start: '2026-08-11', end: '2026-08-15' }])
+  })
+
+  it('LOG_PERIOD_END before any start is rejected', () => {
+    const base = { ...initialState(), cycleLog: [{ start: '2026-08-11' }] }
+    const next = reducer(base, { type: 'LOG_PERIOD_END', date: '2026-08-01' })
+    expect(next).toBe(base)
+  })
+
+  it('DELETE_CYCLE removes the matching start', () => {
+    const base = { ...initialState(), cycleLog: [{ start: '2026-07-14' }, { start: '2026-08-11' }] }
+    const next = reducer(base, { type: 'DELETE_CYCLE', start: '2026-07-14' })
+    expect(next.cycleLog).toEqual([{ start: '2026-08-11' }])
+  })
+})
