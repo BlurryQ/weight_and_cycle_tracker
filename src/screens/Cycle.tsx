@@ -236,6 +236,21 @@ export function Cycle() {
               </span>
             </div>
           ))}
+          {spans.some((s) => s.irregular) && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 7, height: 7, borderRadius: 2, background: 'var(--text-dim)' }} />
+              <span
+                style={{
+                  font: '600 9px/1 "Barlow Condensed", sans-serif',
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                Irregular
+              </span>
+            </div>
+          )}
         </div>
         <SegmentedControl
           value={cycleWindow}

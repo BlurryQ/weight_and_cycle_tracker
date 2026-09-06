@@ -17,9 +17,13 @@ const PHASE_VAR: Record<CyclePhase, string> = {
 const BAND_ALPHA: Record<CyclePhase, number> = { Menstrual: 17, Follicular: 11, Ovulation: 20, Luteal: 17 }
 const PRED_ALPHA: Record<CyclePhase, number> = { Menstrual: 7, Follicular: 4.5, Ovulation: 8, Luteal: 7 }
 
-function bandFill(name: CyclePhase, predicted: boolean): string {
-  const pct = predicted ? PRED_ALPHA[name] : BAND_ALPHA[name]
-  return `color-mix(in oklch, var(${PHASE_VAR[name]}) ${pct}%, transparent)`
+function bandFill(span: CycleSpan): string {
+  // Cycles too short to phase-split (see buildCycleSpans) get a neutral muted band, not a colour.
+  if (span.irregular) {
+    return `color-mix(in oklch, var(--text-dim) ${span.predicted ? 4 : 8}%, transparent)`
+  }
+  const pct = span.predicted ? PRED_ALPHA[span.name] : BAND_ALPHA[span.name]
+  return `color-mix(in oklch, var(${PHASE_VAR[span.name]}) ${pct}%, transparent)`
 }
 
 interface CycleChartProps {
@@ -60,7 +64,7 @@ export function CycleChart({ entries, spans, starts, nextStart, from, to, today,
     const bands = spans.map((s) => {
       const bx = x(s.start)
       const bw = Math.max(1, x(addDays(s.end, 1)) - bx)
-      return { x: bx, w: bw, fill: bandFill(s.name, s.predicted) }
+      return { x: bx, w: bw, fill: bandFill(s) }
     })
 
     const grid: { y: number; label: string }[] = []

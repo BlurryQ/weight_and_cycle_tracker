@@ -132,6 +132,21 @@ describe('buildCycleSpans', () => {
       expect(spans[i].start).toBe(addDays(spans[i - 1].end, 1))
     }
   })
+
+  it('shades an implausibly short cycle as one irregular band, not four phases', () => {
+    // A period logged 14 days after the previous start, then a normal-length cycle after it.
+    const log: CycleLogEntry[] = [{ start: '2026-07-14' }, { start: '2026-07-28' }, { start: '2026-08-25' }]
+    const s = buildCycleSpans(log, '2026-07-01', '2026-09-15', TODAY, 29)
+
+    const shortBand = s.filter((x) => x.start >= '2026-07-14' && x.end < '2026-07-28')
+    expect(shortBand).toHaveLength(1)
+    expect(shortBand[0]).toMatchObject({ irregular: true, start: '2026-07-14', end: '2026-07-27', predicted: false })
+
+    // the following 28-day cycle still gets its real phases
+    expect(s.some((x) => x.name === 'Ovulation' && !x.irregular)).toBe(true)
+    // spans stay contiguous across the irregular band
+    for (let i = 1; i < s.length; i++) expect(s[i].start).toBe(addDays(s[i - 1].end, 1))
+  })
 })
 
 describe('cycleDayToday', () => {
@@ -216,5 +231,24 @@ describe('phaseDeltas — per-cycle de-trending', () => {
     // well above the flat follicular baseline.
     expect(deltas.Luteal).toBeGreaterThan(0.1)
     expect(deltas.Luteal - deltas.Follicular).toBeGreaterThan(0.1)
+  })
+
+  it('excludes an implausibly short cycle from the phase buckets', () => {
+    // Four flat 28-day cycles, then a 14-day cycle (the most recent completed one) with a spike.
+    const log = startsBack([14, 28, 28, 28, 28], '2026-08-11')
+    const cycles = buildCycles(log, '2026-03-01', TODAY, 28)
+    const shortCycle = cycles.find((c) => !c.projected && c.len < 21)!
+    expect(shortCycle).toBeTruthy() // the 14-day cycle is in range
+
+    const entries: Entry[] = []
+    for (let i = 0; i < 200; i++) {
+      const date = addDays('2026-03-01', i)
+      const inShort = date >= shortCycle.start && date < addDays(shortCycle.start, shortCycle.len)
+      entries.push({ date, lbs: 150 + (inShort ? 10 : 0) })
+    }
+
+    const deltas = phaseDeltas(entries, cycles)
+    // The 10 lb spike lives entirely inside the excluded cycle, so no phase absorbs it.
+    for (const v of Object.values(deltas)) expect(Math.abs(v)).toBeLessThan(0.05)
   })
 })
