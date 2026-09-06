@@ -17,6 +17,7 @@ export interface CycleSpan {
   start: string // inclusive ISO date
   end: string // inclusive ISO date
   predicted: boolean // true when the span begins after today (drawn faded)
+  irregular?: boolean // true for a cycle too short to split into phases honestly (drawn as one muted band)
 }
 
 /** One cycle: a start date, its length in days (gap to the next logged start, or the median
@@ -191,6 +192,24 @@ export function buildCycleSpans(
   const spans: CycleSpan[] = []
 
   for (const c of cycles) {
+    // A cycle shorter than MIN_LEN is an early bleed — most likely a short follicular phase or an
+    // anovulatory cycle. The four-phase split can't be drawn honestly at that length (see
+    // phaseRanges' proportional fallback), so shade the whole cycle as one low-confidence band
+    // instead of implying a real menstrual → follicular → ovulation → luteal progression.
+    if (c.len < MIN_LEN) {
+      const spanStart = c.start
+      const spanEnd = addDays(c.start, Math.max(0, Math.round(c.len) - 1))
+      if (spanEnd < from || spanStart > cap) continue
+      spans.push({
+        name: 'Menstrual',
+        start: maxDate(spanStart, from),
+        end: minDate(spanEnd, cap),
+        predicted: spanStart > today,
+        irregular: true,
+      })
+      continue
+    }
+
     const endOffset = c.end ? diffDays(c.start, c.end) : undefined
     for (const r of phaseRanges(c.len, endOffset)) {
       const spanStart = addDays(c.start, r.from)
@@ -306,7 +325,9 @@ export function dailyRollingAverage(entries: Entry[], from: string, to: string):
  * contributes nothing), then the residual on each day is bucketed by phase and averaged.
  * The result is a water-weight signature like `{ Luteal: +1.4, Menstrual: -0.9, … }`. */
 export function phaseDeltas(entries: Entry[], cycles: Cycle[]): Record<CyclePhase, number> {
-  const completed = cycles.filter((c) => !c.projected).slice(-6)
+  // Skip implausibly short cycles: their compressed phase split would tag real weigh-ins with a
+  // bogus "luteal" (etc.) label and pollute the per-phase water-weight signature.
+  const completed = cycles.filter((c) => !c.projected && c.len >= MIN_LEN).slice(-6)
   const sums: Record<CyclePhase, number> = { Menstrual: 0, Follicular: 0, Ovulation: 0, Luteal: 0 }
   const counts: Record<CyclePhase, number> = { Menstrual: 0, Follicular: 0, Ovulation: 0, Luteal: 0 }
 
