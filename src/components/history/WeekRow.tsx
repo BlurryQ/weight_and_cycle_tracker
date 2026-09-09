@@ -2,9 +2,11 @@
 // its theme overhaul. Fork deltas:
 //  - local formatKcal kept (byte-identical to upstream's lib/format.ts formatKcal; keeps this
 //    port off format.ts, which this branch doesn't own).
-//  - NEW `hasPeriod` prop -> a small --menstrual dot on the collapsed summary row when any day
-//    of the week falls inside a logged period. Absolutely positioned so it can't shift the
-//    flex columns at narrow widths. REVIEW IN SCREENSHOT: dot size / offset vs the date label.
+//  - NEW `periodDays` prop (Set of this week's ISO dates inside a logged period) -> a small
+//    --menstrual dot on the collapsed summary row when the set is non-empty, and one on each
+//    matching day in the expanded list. All absolutely positioned so they can't shift the
+//    flex columns at narrow widths, and column-aligned with the summary dot (8px from the card
+//    edge).
 import { addDays, DAY_NAMES, weekCommencingLabel } from '../../lib/dates'
 import type { NutritionEntry } from '../../lib/energy'
 import { formatWeight, sgn, toDisplay } from '../../lib/format'
@@ -31,8 +33,9 @@ interface WeekRowProps {
   hasPrev: boolean
   signColorOf: (v: number) => SignColor
   phase: PhaseAt
-  /** True when any day of this week falls inside a logged period (periodDaysInRange). */
-  hasPeriod: boolean
+  /** This week's ISO dates that fall inside a logged period (periodDaysInRange). Non-empty ->
+   * the collapsed row is flagged; individual matches flag their day in the expanded list. */
+  periodDays: Set<string>
   open: boolean
   onToggle: () => void
   entries: Entry[]
@@ -55,7 +58,7 @@ export function WeekRow({
   hasPrev,
   signColorOf,
   phase,
-  hasPeriod,
+  periodDays,
   open,
   onToggle,
   entries,
@@ -71,8 +74,8 @@ export function WeekRow({
     <div style={{ position: 'relative', marginBottom: 8, borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
       {/* Period marker — absolutely placed so it never perturbs the summary row's flex columns
           at narrow widths. left:8 keeps a comfortable gap from the enclosing PhaseCard's inner
-          border while staying left of the date label's 14px inset. REVIEW IN SCREENSHOT. */}
-      {hasPeriod && (
+          border while staying left of the date label's 14px inset. */}
+      {periodDays.size > 0 && (
         <span
           aria-hidden
           style={{
@@ -180,8 +183,25 @@ export function WeekRow({
             return (
               <div
                 key={date}
-                style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}
+                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}
               >
+                {/* Same --menstrual dot as the summary row, column-aligned with it (left:-6 of
+                    the row's 14px inset = 8px from the card edge). */}
+                {periodDays.has(date) && (
+                  <span
+                    aria-hidden
+                    style={{
+                      position: 'absolute',
+                      left: -6,
+                      top: '50%',
+                      marginTop: -2,
+                      width: 4,
+                      height: 4,
+                      borderRadius: 999,
+                      background: 'var(--menstrual)',
+                    }}
+                  />
+                )}
                 <span style={{ width: 40, font: '500 13px "IBM Plex Mono", monospace', color: isToday ? 'var(--accent)' : 'var(--text-dim)' }}>
                   {dn}
                 </span>

@@ -1,7 +1,8 @@
 // Ported from weight_tracker main:src/screens/History.tsx (Neon UX rework), minus its theme
 // overhaul. Fork deltas:
 //  - SIGN_COLOR uses groundwork's static cyan aliases (== upstream's --sign-good / --sign-bad).
-//  - period indicator: each WeekRow gets `hasPeriod` from periodDaysInRange over its Mon–Sun span.
+//  - period indicator: each WeekRow gets its week's `periodDays` set from periodDaysInRange over
+//    the Mon–Sun span — drives the collapsed-row dot and the per-day dots in the expanded list.
 import type { ReactNode } from 'react'
 import { addDays, DAY_NAMES, fullDate, today as todayIso, weekCommencingLabel } from '../lib/dates'
 import { periodDaysInRange } from '../lib/cycle'
@@ -203,8 +204,9 @@ export function History() {
           // whatever phase you're in today — a gain during a real Bulk week was the goal, and
           // should read lime there even while looking at History mid-Cut.
           const rowDir = phaseAtWeek.dir ?? dir
-          // A logged period touching any day of this Mon–Sun week flags the row (see WeekRow).
-          const hasPeriod = periodDaysInRange(cycleLog, week.monday, addDays(week.monday, 6)).size > 0
+          // Days of this Mon–Sun week that fall inside a logged period: any -> the collapsed
+          // row's dot; per-date -> a dot on that day in the expanded list (see WeekRow).
+          const periodDays = periodDaysInRange(cycleLog, week.monday, addDays(week.monday, 6))
           return (
             <WeekRow
               key={week.monday}
@@ -215,7 +217,7 @@ export function History() {
               hasPrev={deltaLbs != null}
               signColorOf={(v) => signColor(v, rowDir)}
               phase={phaseAtWeek}
-              hasPeriod={hasPeriod}
+              periodDays={periodDays}
               open={openWeek === week.monday}
               onToggle={() => dispatch({ type: 'TOGGLE_WEEK', monday: week.monday })}
               entries={entries}
