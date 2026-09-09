@@ -1,8 +1,8 @@
 import { addDays, mondayOf, today as todayIso } from '../lib/dates'
 import { applyKeypadKey, toDisplay } from '../lib/format'
 import { dedupePhaseLog } from '../lib/math'
-import type { AppState, CycleWindow, PersistedState, Screen, SolveMode, TrendHorizon, TrendWindow, Unit } from './types'
-import type { TrainingPhase } from '../lib/math'
+import type { AppState, CycleWindow, PersistedState, Screen, SolveMode, TrendWindow, TrendWindowMode, Unit } from './types'
+import type { PhaseName } from '../lib/math'
 import type { CycleLogEntry } from '../lib/cycle'
 import type { NutritionEntry } from '../lib/energy'
 
@@ -14,13 +14,22 @@ export type Action =
   | { type: 'SAVE_ENTRY'; date: string; lbs: number }
   | { type: 'DELETE_ENTRY'; date: string }
   | { type: 'MERGE_NUTRITION'; entries: NutritionEntry[] }
-  | { type: 'SET_PHASE'; phase: TrainingPhase }
+  | { type: 'SET_PHASE'; phase: PhaseName }
   | { type: 'RESTART_PHASE' }
   | { type: 'SET_PHASE_WEEK'; week: number }
+  /** Deload/Maintain as a one-week event, not a phase change — appends to phaseLog only,
+   * leaves phase/phaseStart untouched. See SET_PHASE for the "this is now my real phase" path. */
+  | { type: 'LOG_FOLDED_WEEK'; name: 'Maintain' | 'Deload' }
+  /** Staging step for a real phase change (Setup's Cut/Bulk/Maintain grid) — tapping a card no
+   * longer applies SET_PHASE immediately; it stages a pending selection that COMMIT_PHASE_CHANGE
+   * applies, so a mistap doesn't silently start a bulk. */
+  | { type: 'STAGE_PHASE'; phase: PhaseName }
+  | { type: 'COMMIT_PHASE_CHANGE' }
+  | { type: 'UNDO_PHASE_CHANGE' }
   | { type: 'SET_WEEKLY_TARGET'; value: number }
   | { type: 'SET_UNIT'; unit: Unit }
   | { type: 'SET_TREND_WINDOW'; window: TrendWindow }
-  | { type: 'SET_TREND_HORIZON'; horizon: TrendHorizon }
+  | { type: 'SET_TREND_WINDOW_MODE'; mode: TrendWindowMode }
   | { type: 'SET_CYCLE_WINDOW'; window: CycleWindow }
   | { type: 'LOG_PERIOD_START'; date: string }
   | { type: 'LOG_PERIOD_END'; date: string }
@@ -35,8 +44,15 @@ export type Action =
   | { type: 'HYDRATE'; state: Partial<PersistedState> }
   | { type: 'SET_SYNC_FAILED'; failed: boolean }
 
-function withPhaseLogAppend(phaseLog: AppState['phaseLog'], start: string, name: TrainingPhase) {
+function withPhaseLogAppend(phaseLog: AppState['phaseLog'], start: string, name: PhaseName) {
   return dedupePhaseLog([...phaseLog, { start, name }])
+}
+
+/** The actual "make this the real phase" transition, shared by SET_PHASE (direct, still used as
+ * the underlying primitive) and COMMIT_PHASE_CHANGE (the staged path Setup's grid now uses). */
+function applyPhaseChange(state: AppState, phase: PhaseName): Pick<AppState, 'phase' | 'phaseStart' | 'phaseLog'> {
+  const start = todayIso()
+  return { phase, phaseStart: start, phaseLog: withPhaseLogAppend(state.phaseLog, start, phase) }
 }
 
 function sortCycleLog(log: CycleLogEntry[]): CycleLogEntry[] {
@@ -108,13 +124,7 @@ export function reducer(state: AppState, action: Action): AppState {
       // Setup and tapping your current phase (e.g. just to look at it) silently zeroes the week
       // counter back to 1.
       if (action.phase === state.phase) return state
-      const start = todayIso()
-      return {
-        ...state,
-        phase: action.phase,
-        phaseStart: start,
-        phaseLog: withPhaseLogAppend(state.phaseLog, start, action.phase),
-      }
+      return { ...state, ...applyPhaseChange(state, action.phase) }
     }
 
     case 'RESTART_PHASE': {
@@ -135,6 +145,43 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, phaseStart }
     }
 
+    case 'LOG_FOLDED_WEEK':
+      return { ...state, phaseLog: withPhaseLogAppend(state.phaseLog, todayIso(), action.name) }
+
+    case 'STAGE_PHASE': {
+      // Tapping the already-committed phase no-ops (clears any stray staging rather than
+      // starting one — you're already on it). Tapping the already-staged phase again cancels
+      // the staging. Anything else replaces whatever was staged.
+      if (action.phase === state.phase || action.phase === state.pendingPhase) {
+        return state.pendingPhase === null ? state : { ...state, pendingPhase: null }
+      }
+      return { ...state, pendingPhase: action.phase }
+    }
+
+    case 'COMMIT_PHASE_CHANGE': {
+      if (!state.pendingPhase || state.pendingPhase === state.phase) return { ...state, pendingPhase: null }
+      return {
+        ...state,
+        ...applyPhaseChange(state, state.pendingPhase),
+        pendingPhase: null,
+        // Stash exactly enough of the pre-change state for UNDO_PHASE_CHANGE to restore it —
+        // the undo toast's window is how long this stays available (CLEAR_TOAST drops it too).
+        phaseUndo: { phase: state.phase, phaseStart: state.phaseStart, phaseLog: state.phaseLog },
+      }
+    }
+
+    case 'UNDO_PHASE_CHANGE': {
+      if (!state.phaseUndo) return state
+      return {
+        ...state,
+        phase: state.phaseUndo.phase,
+        phaseStart: state.phaseUndo.phaseStart,
+        phaseLog: state.phaseUndo.phaseLog,
+        phaseUndo: null,
+        toast: null,
+      }
+    }
+
     case 'SET_WEEKLY_TARGET':
       return { ...state, weeklyTarget: action.value }
 
@@ -144,8 +191,8 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'SET_TREND_WINDOW':
       return { ...state, trendWindow: action.window }
 
-    case 'SET_TREND_HORIZON':
-      return { ...state, trendHorizon: action.horizon }
+    case 'SET_TREND_WINDOW_MODE':
+      return { ...state, trendWindowMode: action.mode }
 
     case 'SET_CYCLE_WINDOW':
       return { ...state, cycleWindow: action.window }
@@ -192,7 +239,9 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, toast: action.message }
 
     case 'CLEAR_TOAST':
-      return { ...state, toast: null }
+      // Dropping phaseUndo here too — undo is only ever offered for the toast window it arrived
+      // with, not indefinitely after it's gone from screen.
+      return { ...state, toast: null, phaseUndo: null }
 
     case 'HYDRATE':
       return { ...state, ...action.state, phaseLog: dedupePhaseLog(action.state.phaseLog ?? state.phaseLog), hydrated: true }

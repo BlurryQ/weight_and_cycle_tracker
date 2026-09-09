@@ -1,4 +1,4 @@
-import type { Entry, PhaseLogEntry, TrainingPhase } from '../lib/math'
+import type { Entry, PhaseLogEntry, PhaseName, TrendWindowMode } from '../lib/math'
 import type { CycleLogEntry } from '../lib/cycle'
 import type { NutritionEntry } from '../lib/energy'
 
@@ -6,8 +6,8 @@ export type Screen = 'today' | 'trends' | 'cycle' | 'history' | 'setup'
 export type Unit = 'lb' | 'kg'
 export type SolveMode = 'weight' | 'date'
 export type TrendWindow = 8 | 13 | 26 | 99
-export type TrendHorizon = 4 | 6 | 12
 export type CycleWindow = 8 | 13 | 26
+export type { TrendWindowMode }
 
 /** State persisted to local cache and, once synced, to Supabase. */
 export interface PersistedState {
@@ -16,14 +16,17 @@ export interface PersistedState {
    * Read-through cache of the `daily_nutrition` table; empty on platforms without Health
    * Connect. */
   nutrition: NutritionEntry[]
-  phase: TrainingPhase
+  phase: PhaseName
   phaseStart: string
   phaseLog: PhaseLogEntry[]
   cycleLog: CycleLogEntry[]
   weeklyTarget: number
   unit: Unit
   trendWindow: TrendWindow
-  trendHorizon: TrendHorizon
+  /** 'weeks' uses `trendWindow` as-is; 'phaseStart'/'lastDeload'/'lastMaintain' scope the
+   * chart's window to a phase-log anchor instead (see `phaseAnchoredShowN`) — `trendWindow` is
+   * ignored in those. */
+  trendWindowMode: TrendWindowMode
   cycleWindow: CycleWindow
   solveMode: SolveMode
   targetLbs: number
@@ -44,6 +47,12 @@ export interface UiState {
   syncFailed: boolean
   /** True once the initial local/remote hydration has completed. */
   hydrated: boolean
+  /** A phase tapped on Setup's grid but not yet committed — STAGE_PHASE sets this,
+   * COMMIT_PHASE_CHANGE applies it. Lets a mistap be caught before it starts a real phase. */
+  pendingPhase: PhaseName | null
+  /** The phase/phaseStart/phaseLog a COMMIT_PHASE_CHANGE just replaced, kept just long enough
+   * for UNDO_PHASE_CHANGE to restore it (cleared together with the toast that offers it). */
+  phaseUndo: { phase: PhaseName; phaseStart: string; phaseLog: PhaseLogEntry[] } | null
 }
 
 export type AppState = PersistedState & UiState
@@ -58,7 +67,7 @@ export const PERSISTED_KEYS: (keyof PersistedState)[] = [
   'weeklyTarget',
   'unit',
   'trendWindow',
-  'trendHorizon',
+  'trendWindowMode',
   'cycleWindow',
   'solveMode',
   'targetLbs',
@@ -77,7 +86,7 @@ export function initialState(): AppState {
     weeklyTarget: -1.0,
     unit: 'lb',
     trendWindow: 26,
-    trendHorizon: 6,
+    trendWindowMode: 'weeks',
     cycleWindow: 13,
     solveMode: 'weight',
     targetLbs: 175,
@@ -90,5 +99,7 @@ export function initialState(): AppState {
     toast: null,
     syncFailed: false,
     hydrated: false,
+    pendingPhase: null,
+    phaseUndo: null,
   }
 }

@@ -9,6 +9,14 @@ interface SegmentedControlProps<T extends string | number> {
   onChange: (value: T) => void
   /** Active-pill fill. Defaults to the cyan accent; the Cycle screen passes --ovulation. */
   accent?: string
+  /** 'lg' matches the scale of a standalone, prominent control (e.g. the Trends window picker);
+   * default 'sm' is the original compact scale used everywhere else. */
+  size?: 'sm' | 'lg'
+}
+
+const SIZES = {
+  sm: { padding: '6px 12px', font: '600 10px/1 "Barlow Condensed", sans-serif' },
+  lg: { padding: '9px 14px', font: '600 11.5px/1 "Barlow Condensed", sans-serif' },
 }
 
 /** The pill-track segmented control used for unit, trend window, trend horizon, Reach mode, and
@@ -18,7 +26,9 @@ export function SegmentedControl<T extends string | number>({
   value,
   onChange,
   accent = 'var(--cyan)',
+  size = 'sm',
 }: SegmentedControlProps<T>) {
+  const scale = SIZES[size]
   return (
     <div
       style={{
@@ -38,11 +48,11 @@ export function SegmentedControl<T extends string | number>({
             onClick={() => onChange(opt.value)}
             style={{
               flex: 1,
-              padding: '6px 12px',
+              padding: scale.padding,
               borderRadius: 999,
               background: active ? accent : 'transparent',
               color: active ? 'var(--ink-on-accent)' : 'var(--text-dim)',
-              font: '600 10px/1 "Barlow Condensed", sans-serif',
+              font: scale.font,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
               cursor: 'pointer',

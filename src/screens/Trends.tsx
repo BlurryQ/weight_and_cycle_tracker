@@ -15,7 +15,7 @@ import {
   type SignColor,
 } from '../lib/math'
 import { useApp } from '../store/AppContext'
-import type { TrendHorizon, TrendWindow } from '../store/types'
+import type { TrendWindow } from '../store/types'
 import { WeightChart } from '../components/chart/WeightChart'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
 
@@ -32,11 +32,11 @@ const WINDOW_OPTIONS: { value: TrendWindow; label: string }[] = [
   { value: 99, label: 'ALL' },
 ]
 
-const HORIZON_OPTIONS: { value: TrendHorizon; label: string }[] = [
-  { value: 4, label: '4W' },
-  { value: 6, label: '6W' },
-  { value: 12, label: '12W' },
-]
+// Transitional: trendHorizon was dropped in the groundwork port (upstream couples the chart's
+// forward projection to the Reach solver's solved weeks instead). The trends-history port agent
+// replaces this whole file with upstream's Trends; until then the projection uses a fixed 6-week
+// horizon so the screen still renders.
+const PROJECTION_WEEKS = 6
 
 const kcal = (n: number) => Math.round(n).toLocaleString('en-US')
 
@@ -143,7 +143,7 @@ function StatCard({ label, value, color, note }: { label: string; value: string;
 
 export function Trends() {
   const { state, dispatch } = useApp()
-  const { entries, nutrition, phase, phaseLog, unit, trendWindow, trendHorizon } = state
+  const { entries, nutrition, phase, phaseLog, unit, trendWindow } = state
   const today = todayIso()
 
   const weekly = weeklyAverages(entries)
@@ -154,7 +154,7 @@ export function Trends() {
   const geometry = buildChartGeometry(
     weekly,
     spans,
-    { W: 316, H: 184, gutter: 32, showN: trendWindow, fitK, fwd: trendHorizon, gridN: 5 },
+    { W: 316, H: 184, gutter: 32, showN: trendWindow, fitK, fwd: PROJECTION_WEEKS, gridN: 5 },
     (lbs) => toDisplay(lbs, unit),
     foldedWeeks(phaseLog),
     state.weeklyTarget,
@@ -247,11 +247,9 @@ export function Trends() {
           >
             If this continues
           </span>
-          <SegmentedControl
-            value={trendHorizon}
-            onChange={(horizon) => dispatch({ type: 'SET_TREND_HORIZON', horizon })}
-            options={HORIZON_OPTIONS}
-          />
+          <span style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
+            {PROJECTION_WEEKS}W
+          </span>
         </div>
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ font: '700 36px/1 "Barlow Condensed", sans-serif', color: 'var(--text-primary)' }}>

@@ -13,7 +13,7 @@ function settingsFrom(state: AppState): SettingsPayload {
     weeklyTarget: state.weeklyTarget,
     unit: state.unit,
     trendWindow: state.trendWindow,
-    trendHorizon: state.trendHorizon,
+    trendWindowMode: state.trendWindowMode,
     cycleWindow: state.cycleWindow,
     solveMode: state.solveMode,
     targetLbs: state.targetLbs,
@@ -25,7 +25,7 @@ const SETTINGS_ACTION_TYPES = new Set<Action['type']>([
   'SET_WEEKLY_TARGET',
   'SET_UNIT',
   'SET_TREND_WINDOW',
-  'SET_TREND_HORIZON',
+  'SET_TREND_WINDOW_MODE',
   'SET_CYCLE_WINDOW',
   'SET_SOLVE_MODE',
   'SET_TARGET_LBS',
@@ -53,10 +53,18 @@ function queueSideEffects(action: Action, next: AppState) {
       }
       break
     case 'SET_PHASE':
-    case 'RESTART_PHASE': {
+    case 'RESTART_PHASE':
+    case 'COMMIT_PHASE_CHANGE':
+    case 'UNDO_PHASE_CHANGE': {
       const last = next.phaseLog[next.phaseLog.length - 1]
       if (last) enqueue({ op: 'upsert_phase', payload: { start: last.start, name: last.name } })
       enqueue({ op: 'upsert_settings', payload: settingsFrom(next) })
+      break
+    }
+    case 'LOG_FOLDED_WEEK': {
+      // Only phaseLog changed — phase/phaseStart are untouched by design, so no settings write.
+      const last = next.phaseLog[next.phaseLog.length - 1]
+      if (last) enqueue({ op: 'upsert_phase', payload: { start: last.start, name: last.name } })
       break
     }
     case 'LOG_PERIOD_START':

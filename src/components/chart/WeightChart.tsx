@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { diffDays } from '../../lib/dates'
 import type { ChartGeometry } from '../../lib/chartGeometry'
 
 interface WeightChartProps {
@@ -7,26 +8,44 @@ interface WeightChartProps {
   H: number
   gutter: number
   variant: 'today' | 'trends'
+  /** Optional set of ISO dates that fall inside a logged period (see
+   * `cycle.periodDaysInRange`). When present, each in-range day gets a small --menstrual tick
+   * on the chart baseline — a faint calendar of "when the bleed was" under the weight line, so
+   * a luteal-phase water bump lines up visually with the period that follows it. Purely
+   * decorative; it never shifts the line, bands, or domain. */
+  periodDays?: Set<string>
 }
 
-// Band fills / edges are the --cyan and --blue tokens at low alpha; the labels are the solid
-// tokens. Keep these in sync with :root so the Cut/Bulk shading matches its swatch colour.
-const CUT_FILL = 'oklch(0.82 0.11 208 / .05)'
-const CUT_EDGE = 'oklch(0.82 0.11 208 / .22)'
-const CUT_LABEL = 'oklch(0.86 0.09 208)'
-const BULK_FILL = 'oklch(0.76 0.13 235 / .07)'
-const BULK_EDGE = 'oklch(0.76 0.13 235 / .28)'
-const BULK_LABEL = 'oklch(0.76 0.13 235)'
+const CUT_FILL = 'var(--band-cut-fill)'
+const CUT_EDGE = 'var(--band-cut-edge)'
+const CUT_LABEL = 'var(--band-cut-label)'
+const BULK_FILL = 'var(--band-bulk-fill)'
+const BULK_EDGE = 'var(--band-bulk-edge)'
+const BULK_LABEL = 'var(--band-bulk-label)'
 
 /** Renders the weekly-average chart shared by Today (compact) and Trends (full). Geometry
  * comes from lib/chartGeometry.ts — this component only draws it, back to front: bands,
  * gridlines, area, trend line (faint past + dashed forward), data line, target reference,
- * dots. */
-export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartProps) {
+ * period ticks, dots. */
+export function WeightChart({ geometry: g, W, H, gutter, variant, periodDays }: WeightChartProps) {
   const gradId = useId()
   const isTrends = variant === 'trends'
 
   if (!g.line) return null
+
+  // Map each period day to an x on the same axis the weekly points sit on. The shown weekly
+  // points span indices 0..(weeks-1), and X(i) = i * lastX / (weeks-1) holds for fractional i
+  // too, so a mid-week day lands between its neighbouring dots. Days outside the drawn data
+  // window (before the first shown week, or in the forward-projection zone) are dropped.
+  const periodTicks: number[] = []
+  if (periodDays && periodDays.size && g.weeks > 1) {
+    const span = g.weeks - 1
+    for (const iso of periodDays) {
+      const idx = span - diffDays(iso, g.lastMonday) / 7
+      if (idx < 0 || idx > span) continue
+      periodTicks.push((idx / span) * g.lastX)
+    }
+  }
 
   return (
     <div style={{ position: 'relative', paddingLeft: gutter }}>
@@ -63,8 +82,8 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
           {line.value}
         </div>
       ))}
-      {/* The one label the chart needs — the trend line grows out of the data, so it names
-          itself; only the reference does not. Right-aligned to the chart edge. */}
+      {/* The goal-pace line is the one thing that needs naming — the trend line grows out of
+          the data. Right-aligned to the chart edge, just below its endpoint. */}
       {g.targetProj && (
         <div
           style={{
@@ -83,8 +102,8 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
       <svg width={W} height={H} style={{ overflow: 'visible', display: 'block' }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--cyan)" stopOpacity={isTrends ? 0.15 : 0.16} />
-            <stop offset="100%" stopColor="var(--cyan)" stopOpacity={0} />
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity={isTrends ? 0.15 : 0.16} />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
           </linearGradient>
         </defs>
 
@@ -111,59 +130,78 @@ export function WeightChart({ geometry: g, W, H, gutter, variant }: WeightChartP
         ))}
 
         {g.markers.map((x, i) => (
-          <line key={i} x1={x} x2={x} y1={0} y2={H} stroke="rgba(255,255,255,0.4)" strokeWidth={1} />
+          <line key={i} x1={x} x2={x} y1={0} y2={H} stroke="var(--band-marker)" strokeWidth={1} />
         ))}
 
         {g.grid.map((line, i) => (
           <line key={i} x1={0} x2={W} y1={line.y} y2={line.y} stroke="var(--hairline-strong)" strokeWidth={1} />
         ))}
 
-        <path d={g.area} fill={`url(#${gradId})`} stroke="none" />
+        <path className="accent-el" d={g.area} fill={`url(#${gradId})`} stroke="none" />
 
         {/* Trend line, one object: a faint solid connector back into the data … */}
-        <path d={g.trendPast} fill="none" stroke="var(--cyan)" strokeWidth={1.4} strokeLinecap="round" opacity={0.4} />
+        <path className="accent-el" d={g.trendPast} fill="none" stroke="var(--accent)" strokeWidth={1.4} strokeLinecap="round" opacity={0.4} />
 
-        <path d={g.line} fill="none" stroke="var(--cyan)" strokeWidth={2.1} strokeLinejoin="round" />
+        <path className="accent-el" d={g.line} fill="none" stroke="var(--accent)" strokeWidth={2.1} strokeLinejoin="round" />
 
-        {/* … continued forward as the dashed projection. This is the headline line: full weight. */}
-        <path d={g.proj} fill="none" stroke="var(--cyan)" strokeWidth={2} strokeDasharray="5 4" strokeLinecap="round" />
+        {/* … continued forward as the dashed projection. */}
+        <path
+          className="accent-el"
+          d={g.proj}
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth={1.8}
+          strokeDasharray="5 4"
+          strokeLinecap="round"
+          opacity={0.72}
+        />
 
-        {/* Target-rate reference: forward only, thinner and dimmer, with a terminal tick. */}
+        {/* Goal-pace reference: forward only, muted grey, still clearly below the cyan
+            projection — subordinate by colour and a sparser dash, not by near-invisibility.
+            The gap to the projection is the goal-vs-projected read. */}
         {g.targetProj && (
           <>
             <path
               d={g.targetProj}
               fill="none"
               stroke="var(--text-muted)"
-              strokeWidth={1.25}
-              strokeDasharray="1 5"
+              strokeWidth={1.4}
+              strokeDasharray="2 4"
               strokeLinecap="round"
-              opacity={0.5}
+              opacity={0.85}
             />
             <line
-              x1={g.projX}
-              x2={g.projX}
+              x1={g.targetProjX}
+              x2={g.targetProjX}
               y1={g.targetProjY - 4}
               y2={g.targetProjY + 4}
               stroke="var(--text-muted)"
-              strokeWidth={1.25}
-              opacity={0.6}
+              strokeWidth={1.4}
+              opacity={0.9}
             />
           </>
         )}
 
+        {/* Period days: 4px --menstrual ticks flush to the baseline. Subtle — they read as a
+            texture along the bottom edge, not another data series. Tune the height / opacity
+            here if they compete with the weight line. */}
+        {periodTicks.map((x, i) => (
+          <line key={'period' + i} x1={x} x2={x} y1={H - 4} y2={H} stroke="var(--menstrual)" strokeWidth={1.5} opacity={0.9} />
+        ))}
+
         {isTrends &&
           g.dots.map((d, i) => (
-            <circle key={i} cx={d.x} cy={d.y} r={2.4} fill="var(--bg)" stroke="var(--cyan)" strokeWidth={1.2} />
+            <circle className="accent-el" key={i} cx={d.x} cy={d.y} r={2.4} fill="var(--bg)" stroke="var(--accent)" strokeWidth={1.2} />
           ))}
 
-        <circle cx={g.lastX} cy={g.lastY} r={4.5} fill="var(--cyan)" />
+        <circle className="accent-el" cx={g.lastX} cy={g.lastY} r={4.5} fill="var(--accent)" />
         <circle
+          className="accent-el"
           cx={g.projX}
           cy={g.projY}
           r={3.5}
-          fill={isTrends ? 'var(--cyan)' : 'var(--bg)'}
-          stroke="var(--cyan)"
+          fill={isTrends ? 'var(--accent)' : 'var(--bg)'}
+          stroke="var(--accent)"
           strokeWidth={1.6}
         />
       </svg>

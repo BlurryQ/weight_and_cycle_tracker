@@ -234,6 +234,22 @@ function maxDate(a: string, b: string): string {
   return a > b ? a : b
 }
 
+// ── Period days in a date range ───────────────────────────────────────
+
+/** The set of ISO dates within [from, to] that fall inside a logged period, using the same
+ * "in period" rule as PeriodSheet: a day counts when `date >= c.start && date <= (c.end ??
+ * c.start + 4)` — i.e. an unfinished period is assumed to run 5 days. Used by the weight chart
+ * to drop a small --menstrual tick on the baseline at each in-range period day. */
+export function periodDaysInRange(log: CycleLogEntry[], from: string, to: string): Set<string> {
+  const out = new Set<string>()
+  for (const c of log) {
+    const start = maxDate(c.start, from)
+    const end = minDate(c.end ?? addDays(c.start, 4), to)
+    for (let d = start; d <= end; d = addDays(d, 1)) out.add(d)
+  }
+  return out
+}
+
 // ── Where she is right now ────────────────────────────────────────────
 
 export interface CycleToday {

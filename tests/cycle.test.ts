@@ -5,6 +5,7 @@ import {
   cycleDayToday,
   dailyRollingAverage,
   medianCycleLength,
+  periodDaysInRange,
   phaseDeltas,
   phaseForDay,
   phaseRanges,
@@ -250,5 +251,32 @@ describe('phaseDeltas — per-cycle de-trending', () => {
     const deltas = phaseDeltas(entries, cycles)
     // The 10 lb spike lives entirely inside the excluded cycle, so no phase absorbs it.
     for (const v of Object.values(deltas)) expect(Math.abs(v)).toBeLessThan(0.05)
+  })
+})
+
+describe('periodDaysInRange', () => {
+  it('marks a logged period as start..end inclusive, clipped to the range', () => {
+    const log: CycleLogEntry[] = [{ start: '2026-08-10', end: '2026-08-14' }]
+    const days = periodDaysInRange(log, '2026-08-01', '2026-08-31')
+    expect([...days].sort()).toEqual(['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'])
+  })
+
+  it('assumes a 5-day period (start + 4) when no end is logged, same rule as PeriodSheet', () => {
+    const log: CycleLogEntry[] = [{ start: '2026-08-10' }]
+    const days = periodDaysInRange(log, '2026-08-01', '2026-08-31')
+    expect([...days].sort()).toEqual(['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14'])
+  })
+
+  it('clips to the [from, to] window and merges overlapping periods into one set', () => {
+    const log: CycleLogEntry[] = [
+      { start: '2026-07-01', end: '2026-07-05' }, // fully before the window
+      { start: '2026-08-28', end: '2026-09-03' }, // straddles the window end
+    ]
+    const days = periodDaysInRange(log, '2026-08-01', '2026-08-31')
+    expect([...days].sort()).toEqual(['2026-08-28', '2026-08-29', '2026-08-30', '2026-08-31'])
+  })
+
+  it('is empty for an empty log', () => {
+    expect(periodDaysInRange([], '2026-08-01', '2026-08-31').size).toBe(0)
   })
 })

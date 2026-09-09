@@ -51,6 +51,65 @@
   color-scheme: dark;
 }
 
+/* ── Upstream-token compatibility aliases ─────────────────────────────
+   Code ported from weight_tracker's "Neon redesign" refers to a set of
+   --accent* / phase / band / sign tokens that don't exist in this fork.
+   This fork keeps its cyan identity and does NOT adopt upstream's
+   phase-driven accent: every alias below is STATIC — no [data-phase],
+   no @property, no keyframes. They map upstream's names onto the cyan
+   palette already defined above so ported markup resolves unchanged.
+   ──────────────────────────────────────────────────────────────────── */
+:root {
+  /* The single "act on this / headline" colour — here, always cyan. */
+  --accent: var(--cyan);
+  --accent-hover: var(--cyan-hover);
+  --accent-text: var(--cyan-text);
+  --accent-glow: oklch(0.82 0.11 208 / 0.3); /* FAB drop-shadow */
+  --on-accent: var(--ink-on-accent);
+
+  /* Training phase (Cut/Bulk/Maintain) — fixed per phase, NOT tied to a
+     live accent. Maintain is a calm static steel. */
+  --cut: var(--cyan);
+  --bulk: var(--blue);
+  --maintain: oklch(0.74 0.05 250);
+
+  /* +/- weigh-in deltas. This fork shows the "good direction" in cyan
+     (not green); "bad direction" stays red. */
+  --sign-good: var(--cyan);
+  --sign-bad: var(--red);
+
+  /* Chart phase bands — drawn behind the cyan data line. */
+  --band-cut-fill: oklch(0.82 0.11 208 / 0.05);
+  --band-cut-edge: oklch(0.82 0.11 208 / 0.22);
+  --band-cut-label: var(--cyan-text);
+  --band-bulk-fill: oklch(0.76 0.13 235 / 0.07);
+  --band-bulk-edge: oklch(0.76 0.13 235 / 0.28);
+  --band-bulk-label: var(--blue);
+  --band-marker: rgba(255, 255, 255, 0.4); /* phase-change divider */
+
+  /* Phase tags (History rows, Setup). Cut/Bulk carry phase colour;
+     Deload/Maintain read neutral — a hold isn't a direction. */
+  --phase-tag-cut: color-mix(in oklch, var(--cut), var(--text-dim) 28%);
+  --phase-tag-bulk: var(--bulk);
+  --tag-neutral: color-mix(in oklch, var(--text-muted), var(--text-primary) 20%);
+
+  /* Trends weekly-change bars / Today rate-bar status: on-pace vs off. */
+  --wchange-good: var(--cyan);
+  --wchange-against: var(--amber);
+  --pace-off: var(--wchange-against);
+
+  /* Back-compat aliases for literals not yet repointed. */
+  --lime: var(--cyan);
+  --lime-hover: var(--cyan-hover);
+  --lime-text: var(--cyan-text);
+}
+
+/* Inert no-op — upstream tags accent-coloured elements with this for its
+   phase cross-fade shimmer, which this fork does not run. Kept as a
+   class so ported markup validates without change. */
+.accent-el {
+}
+
 * {
   box-sizing: border-box;
 }

@@ -6,6 +6,7 @@ import {
   currentDir,
   fitSlope,
   foldedWeeks,
+  lastCompletedWeek,
   paceStatus,
   phaseSpans,
   projectionWeeks,
@@ -81,10 +82,10 @@ export function Today() {
   const a7 = avg(entries, 7, today)
   const a7prev = avg(entries, 7, today, 7)
   const a14 = avg(entries, 14, today)
-  const a30 = avg(entries, 30, today)
   const wowLbs = a7 != null && a7prev != null ? a7 - a7prev : 0
 
   const weekly = weeklyAverages(entries)
+  const lastWk = lastCompletedWeek(weekly, today)
   const fit4 = fitSlope(weekly, 4)
   const dir = currentDir(phase, phaseLog)
   const lastWeekly = weekly[weekly.length - 1]
@@ -171,7 +172,9 @@ export function Today() {
       <div style={{ marginTop: 20 }}>
         <StatCards
           a14={formatWeight(a14, unit)}
-          a30={formatWeight(a30, unit)}
+          lastWeek={lastWk ? formatWeight(lastWk.lbs, unit) : '—'}
+          lastWeekDelta={lastWk?.deltaLbs != null ? sgn(toDisplay(lastWk.deltaLbs, unit)) : undefined}
+          lastWeekDeltaColor={lastWk?.deltaLbs != null ? signColor(lastWk.deltaLbs, dir) : undefined}
           rateLbs={fit4.slope}
           rateColor={signColor(fit4.slope, dir)}
           unit={unit}

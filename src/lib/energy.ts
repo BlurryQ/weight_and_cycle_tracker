@@ -1,14 +1,17 @@
 import { addDays, diffDays, mondayOf } from './dates'
 import { fitQualityLabel, leastSquaresFit, phaseSpans, type Entry, type PhaseLogEntry } from './math'
 
-/** Energy density of body mass lost — ≈ that of fat (≈ 7700 kcal/kg). The standard constant for
- * the energy-balance equation; imperfect over days (water, glycogen) but reasonable over the
- * 2–4 week window this module works on. */
+/** Energy equivalent of body **fat** — the tissue a cut mostly strips. 3500 kcal/lb
+ * (≈ 7700 kcal/kg), the standard energy-balance constant. */
 export const KCAL_PER_LB_LOSS = 3500
-/** Lower than fat — a gain is part lean tissue/water/glycogen. Conservative blend; tune down
- * for leaner/faster gains, up for an advanced lifter. */
+
+/** Energy equivalent of weight **gained** on a bulk — lower than fat, because a gain is part
+ * lean tissue (~70% water), part glycogen + bound water, part gut fill. 3100 is a conservative
+ * blend (mostly fat, a little lean/water); tune down for leaner/faster gains, up for an
+ * advanced lifter whose surplus adds barely any muscle. */
 export const KCAL_PER_LB_GAIN = 3100
-/** Back-compat alias for the loss density (the original single constant). */
+
+/** Back-compat alias — the loss value is the historical single constant. */
 export const KCAL_PER_LB = KCAL_PER_LB_LOSS
 
 /** Rolling window for the maintenance estimate. Four weekly averages' worth: long enough that
@@ -45,6 +48,10 @@ export interface MaintenanceEstimate {
   calorieDays: number
   /** Actual span the fit covered, first logged day to today, in days. */
   windowDays: number
+  /** ISO date the window actually starts on — `ESTIMATE_WINDOW_DAYS` back, or the current
+   * Cut/Bulk phase start if that's more recent (the clamp). Lets the card explain a short
+   * window right after a phase change. */
+  windowStart: string
   /** R² of the weight fit over the window — a trust signal for the number next to it. */
   r2: number
   /** Plain-English read, e.g. "Reliable · tight fit" or why there's no number yet. */
@@ -60,10 +67,11 @@ function round10(n: number): number {
 }
 
 /** Adaptive-TDEE estimate: rearrange `Δweight ≈ (intake − TDEE) · days / kcalPerLb` to solve
- * for TDEE over a recent window. The window starts `ESTIMATE_WINDOW_DAYS` back but is pulled
- * forward to the most recent Cut/Bulk phase change if that's more recent, so the average never
- * blends two different diets. `kcalPerLb` is the loss density on a cut and the (lower) gain
- * density on a bulk — picked from the logged phase, not the sign of the scale trend. */
+ * for TDEE over a recent window, where kcalPerLb is fat density on a cut and the lower gain
+ * density on a bulk (see the constants). The window starts `ESTIMATE_WINDOW_DAYS` back but is
+ * pulled forward to the most recent Cut/Bulk phase change if that's more recent, so the average
+ * never blends two different diets. Maintain/Deload weeks are left in — the equation
+ * self-corrects for them (intake rises as the weight change shrinks). */
 export function estimateMaintenance(
   entries: Entry[],
   nutrition: NutritionEntry[],
@@ -91,6 +99,7 @@ export function estimateMaintenance(
     weightChangeLbs: null,
     calorieDays,
     windowDays: spanDays,
+    windowStart,
     r2: 0,
   }
 
@@ -108,8 +117,10 @@ export function estimateMaintenance(
   const fit = leastSquaresFit(weightPts)
   const weightChangeLbs = fit.slope * spanDays
   const meanIntake = mean(calPts.map((n) => n.kcal))
-  // Density from the logged phase — the first flat/down week of a bulk (water still settling)
-  // would otherwise be misread as a cut. Scale sign is only the fallback with no phase history.
+  // Density of the weight that actually moved: fat on a cut, a leaner mix on a bulk. Keyed off
+  // the logged phase, not the scale sign — so the first flat/down week of a bulk (glycogen and
+  // water still settling) still uses the gain value. Falls back to observed direction only when
+  // there's no phase history at all.
   const gaining = lastSpan ? lastSpan.dir === 'Bulk' : weightChangeLbs > 0
   const kcalPerLb = gaining ? KCAL_PER_LB_GAIN : KCAL_PER_LB_LOSS
   const maintenanceRaw = meanIntake - (weightChangeLbs * kcalPerLb) / spanDays
@@ -137,14 +148,15 @@ export function estimateMaintenance(
     weightChangeLbs,
     calorieDays,
     windowDays: spanDays,
+    windowStart,
     r2: fit.r2,
     note: `${coverageWord} · ${fitQualityLabel(fit.r2).toLowerCase()}`,
   }
 }
 
 /** Daily calorie target to hit a weekly weight goal: maintenance shifted by the goal's daily
- * energy equivalent. `weeklyTargetLbs` is signed (negative for a cut), so a −1 lb/wk goal
- * subtracts 500/day. A loss is priced at fat density, a gain at the lower gain density. */
+ * energy equivalent. `weeklyTargetLbs` is signed — a −1 lb/wk goal subtracts at fat density
+ * (500/day), a +0.5 lb/wk goal adds at the leaner gain density. */
 export function targetIntake(maintenance: number, weeklyTargetLbs: number): number {
   const kcalPerLb = weeklyTargetLbs < 0 ? KCAL_PER_LB_LOSS : KCAL_PER_LB_GAIN
   return round10(maintenance + (weeklyTargetLbs * kcalPerLb) / 7)

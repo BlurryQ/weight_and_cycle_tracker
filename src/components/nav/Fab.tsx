@@ -11,12 +11,13 @@ export function Fab({ onClick, variant = 'weight' }: FabProps) {
       type="button"
       onClick={onClick}
       aria-label={period ? 'Log a period' : "Log today's weight"}
+      className="accent-el"
       style={{
         width: 54,
         height: 54,
         borderRadius: '50%',
-        background: period ? 'var(--menstrual)' : 'var(--cyan)',
-        boxShadow: period ? '0 6px 18px oklch(0.66 0.17 12 / .35)' : '0 6px 18px oklch(0.82 0.11 208 / .3)',
+        background: period ? 'var(--menstrual)' : 'var(--accent)',
+        boxShadow: period ? '0 6px 18px oklch(0.66 0.17 12 / .35)' : '0 6px 18px var(--accent-glow)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -26,12 +27,12 @@ export function Fab({ onClick, variant = 'weight' }: FabProps) {
     >
       {period ? (
         <svg width="18" height="22" viewBox="0 0 18 22">
-          <path d="M9 1.5C9 1.5 2 9.4 2 13.8A7 7 0 0 0 16 13.8C16 9.4 9 1.5 9 1.5Z" fill="var(--ink-on-accent)" />
+          <path d="M9 1.5C9 1.5 2 9.4 2 13.8A7 7 0 0 0 16 13.8C16 9.4 9 1.5 9 1.5Z" fill="var(--on-accent)" />
         </svg>
       ) : (
         <svg width="20" height="20" viewBox="0 0 20 20">
-          <rect x="9" y="2" width="2" height="16" rx="1" fill="var(--ink-on-accent)" />
-          <rect x="2" y="9" width="16" height="2" rx="1" fill="var(--ink-on-accent)" />
+          <rect x="9" y="2" width="2" height="16" rx="1" fill="var(--on-accent)" />
+          <rect x="2" y="9" width="16" height="2" rx="1" fill="var(--on-accent)" />
         </svg>
       )}
     </button>

@@ -1,5 +1,5 @@
 import type { TrainingPhase } from '../lib/math'
-import type { CycleWindow, SolveMode, TrendHorizon, TrendWindow, Unit } from '../store/types'
+import type { CycleWindow, SolveMode, TrendWindow, TrendWindowMode, Unit } from '../store/types'
 
 export interface SettingsPayload {
   phase: TrainingPhase
@@ -7,7 +7,7 @@ export interface SettingsPayload {
   weeklyTarget: number
   unit: Unit
   trendWindow: TrendWindow
-  trendHorizon: TrendHorizon
+  trendWindowMode: TrendWindowMode
   cycleWindow: CycleWindow
   solveMode: SolveMode
   targetLbs: number
