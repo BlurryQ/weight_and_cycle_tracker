@@ -1,30 +1,30 @@
-import { buildChartGeometry } from '../lib/chartGeometry'
 import { diffDays, mondayOf, shortDate, today as todayIso } from '../lib/dates'
-import { formatWeight, sgn, toDisplay, unitLabel } from '../lib/format'
+import { formatWeight, sgn, toDisplay, toLbs, unitLabel } from '../lib/format'
 import {
   avg,
   currentDir,
+  currentStreak,
   fitSlope,
-  foldedWeeks,
   lastCompletedWeek,
-  paceStatus,
-  phaseSpans,
-  projectionWeeks,
   signColor,
-  solveByDate,
-  solveByWeight,
   weeklyAverages,
 } from '../lib/math'
 import { cycleDayToday, medianCycleLength, type CyclePhase } from '../lib/cycle'
 import { useApp } from '../store/AppContext'
 import { Chip } from '../components/ui/Chip'
-import { WeightChart } from '../components/chart/WeightChart'
 import { ReachCard } from '../components/entry/ReachCard'
-import { PaceRing } from './today/PaceRing'
+import { RateBar } from './today/RateBar'
+import { DayStrip } from './today/DayStrip'
+import { EnergyCard } from './today/EnergyCard'
 import { StatCards } from './today/StatCards'
+import { TrendsChartMirror } from './today/TrendsChartMirror'
+import { buildTrendsChart } from './today/trendsChartGeometry'
 
-const SIGN_COLOR = { lime: 'var(--cyan)', red: 'var(--red)', grey: 'var(--text-muted)' } as const
+const SIGN_COLOR = { lime: 'var(--sign-good)', red: 'var(--sign-bad)', grey: 'var(--text-muted)' } as const
 
+// The fork keeps its two-chip header. The training-phase chip is coloured per chart direction
+// (Cut/Bulk) — a static map, NOT the live --accent; this fork has no [data-phase] accent
+// switching. The second chip, shown only when a cycle is logged, is the menstrual-phase chip.
 const CHIP_COLORS = {
   Cut: {
     bg: 'oklch(0.82 0.11 208 / .13)',
@@ -49,7 +49,19 @@ const PHASE_VAR: Record<CyclePhase, string> = {
 
 export function Today() {
   const { state, dispatch } = useApp()
-  const { entries, phase, phaseStart, phaseLog, cycleLog, weeklyTarget, unit, solveMode, targetLbs, targetWeeks } = state
+  const {
+    entries,
+    nutrition,
+    phase,
+    phaseStart,
+    phaseLog,
+    cycleLog,
+    weeklyTarget,
+    unit,
+    solveMode,
+    targetLbs,
+    targetWeeks,
+  } = state
   const today = todayIso()
   const cyc = cycleDayToday(cycleLog, today, medianCycleLength(cycleLog))
 
@@ -85,29 +97,18 @@ export function Today() {
   const wowLbs = a7 != null && a7prev != null ? a7 - a7prev : 0
 
   const weekly = weeklyAverages(entries)
-  const lastWk = lastCompletedWeek(weekly, today)
   const fit4 = fitSlope(weekly, 4)
   const dir = currentDir(phase, phaseLog)
-  const lastWeekly = weekly[weekly.length - 1]
-  const current = lastWeekly ? lastWeekly.lbs : (a7 ?? 0)
-  const lastMonday = lastWeekly ? lastWeekly.monday : mondayOf(today)
-  const reachCtx = { current, slopeLbs: fit4.slope, lastMonday }
-  const weightResult = solveByWeight(reachCtx, targetLbs)
-  const dateResult = solveByDate(reachCtx, targetWeeks)
-  const solveWeeks = projectionWeeks(solveMode, targetWeeks, weightResult)
+  const lastWeek = lastCompletedWeek(weekly, today)
 
-  const spans = phaseSpans(phaseLog)
-  const geometry = buildChartGeometry(
-    weekly,
-    spans,
-    { W: 320, H: 128, gutter: 28, showN: 26, fitK: 4, fwd: solveWeeks, gridN: 4 },
-    (lbs) => toDisplay(lbs, unit),
-    foldedWeeks(phaseLog),
-  )
-
-  const pace = paceStatus(fit4.slope, weeklyTarget)
   const phaseWeek = Math.floor(diffDays(mondayOf(phaseStart), today) / 7) + 1
+  const streak = currentStreak(entries, today)
   const chipColors = CHIP_COLORS[dir]
+
+  // Today's Reach card and the mirrored Trends chart both read from the one shared builder, so
+  // editing the target here moves this chart's projection, the Reach output, and the Trends
+  // screen identically. Dims match Trends exactly — this is the same chart, not a reduction.
+  const chart = buildTrendsChart(state, today, { W: 316, H: 184, gutter: 32, gridN: 5 })
 
   return (
     <div style={{ padding: '0 20px' }}>
@@ -135,76 +136,74 @@ export function Today() {
         </span>
       </div>
 
-      <div style={{ marginTop: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <div
+      <div style={{ marginTop: 20 }}>
+        <div
+          style={{
+            font: '600 9.5px/1 "Barlow Condensed", sans-serif',
+            letterSpacing: '0.2em',
+            textTransform: 'uppercase',
+            color: 'var(--text-dim)',
+          }}
+        >
+          7-day average
+        </div>
+        <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ font: '700 78px/0.8 "Barlow Condensed", sans-serif', letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
+            {formatWeight(a7, unit)}
+          </span>
+          <span
             style={{
-              font: '600 9.5px/1 "Barlow Condensed", sans-serif',
-              letterSpacing: '0.2em',
+              font: '600 13px/1 "Barlow Condensed", sans-serif',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: 'var(--text-dim)',
             }}
           >
-            7-day average
-          </div>
-          <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ font: '700 78px/0.8 "Barlow Condensed", sans-serif', letterSpacing: '-0.01em', color: 'var(--text-primary)' }}>
-              {formatWeight(a7, unit)}
-            </span>
-            <span
-              style={{
-                font: '600 13px/1 "Barlow Condensed", sans-serif',
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                color: 'var(--text-dim)',
-              }}
-            >
-              {unitLabel(unit)}
-            </span>
-          </div>
-          <div style={{ marginTop: 8, font: '500 11.5px "IBM Plex Mono", monospace', color: SIGN_COLOR[signColor(wowLbs, dir)] }}>
-            {sgn(toDisplay(wowLbs, unit))} on the week
-          </div>
+            {unitLabel(unit)}
+          </span>
         </div>
-        <PaceRing status={pace} />
+        <div style={{ marginTop: 8, font: '500 11.5px "IBM Plex Mono", monospace', color: SIGN_COLOR[signColor(wowLbs, dir)] }}>
+          {sgn(toDisplay(wowLbs, unit))} on the week
+        </div>
       </div>
 
-      <div style={{ marginTop: 20 }}>
+      <div style={{ marginTop: 8, font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
+        <span className="accent-el" style={{ color: 'var(--accent-text)', fontWeight: 600 }}>{streak}</span> day{streak === 1 ? '' : 's'} streak
+      </div>
+
+      <div style={{ marginTop: 18, padding: '14px 15px', borderRadius: 14, background: 'var(--surface)' }}>
+        <RateBar slopeLbs={fit4.slope} weeklyTarget={weeklyTarget} unit={unit} />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <DayStrip entries={entries} today={today} unit={unit} />
+      </div>
+
+      <div style={{ marginTop: 16 }}>
         <StatCards
           a14={formatWeight(a14, unit)}
-          lastWeek={lastWk ? formatWeight(lastWk.lbs, unit) : '—'}
-          lastWeekDelta={lastWk?.deltaLbs != null ? sgn(toDisplay(lastWk.deltaLbs, unit)) : undefined}
-          lastWeekDeltaColor={lastWk?.deltaLbs != null ? signColor(lastWk.deltaLbs, dir) : undefined}
+          lastWeek={lastWeek ? formatWeight(lastWeek.lbs, unit) : '—'}
+          lastWeekDelta={lastWeek?.deltaLbs != null ? sgn(toDisplay(lastWeek.deltaLbs, unit)) : undefined}
+          lastWeekDeltaColor={lastWeek?.deltaLbs != null ? signColor(lastWeek.deltaLbs, dir) : undefined}
           rateLbs={fit4.slope}
           rateColor={signColor(fit4.slope, dir)}
           unit={unit}
         />
       </div>
 
-      <div style={{ marginTop: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span
-            style={{
-              font: '600 9.5px/1 "Barlow Condensed", sans-serif',
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--text-dim)',
-            }}
-          >
-            Weekly average
-          </span>
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'trends' })}
-            style={{ font: '500 10.5px "IBM Plex Mono", monospace', color: 'var(--cyan)', cursor: 'pointer' }}
-          >
-            all trends →
-          </button>
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <WeightChart geometry={geometry} W={320} H={128} gutter={28} variant="today" />
-        </div>
-      </div>
+      <TrendsChartMirror
+        chart={chart}
+        cycleLog={cycleLog}
+        onOpen={() => dispatch({ type: 'SET_SCREEN', screen: 'trends' })}
+      />
+
+      <EnergyCard
+        entries={entries}
+        nutrition={nutrition}
+        phaseLog={phaseLog}
+        weeklyTargetLbs={weeklyTarget}
+        today={today}
+      />
 
       <ReachCard
         unit={unit}
@@ -214,11 +213,28 @@ export function Today() {
         targetWeeks={targetWeeks}
         onEditTarget={() => dispatch({ type: 'OPEN_SHEET', sheet: 'target' })}
         onWeeksChange={(weeks) => dispatch({ type: 'SET_TARGET_WEEKS', value: weeks })}
-        current={current}
-        slopeLbs={fit4.slope}
-        weightResult={weightResult}
-        dateResult={dateResult}
+        current={chart.current}
+        slopeLbs={toLbs(chart.geometry.slope, unit)}
+        weightResult={chart.weightResult}
+        dateResult={chart.dateResult}
       />
+
+      <button
+        type="button"
+        onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'trends' })}
+        className="accent-el"
+        style={{
+          marginTop: 12,
+          marginBottom: 8,
+          width: '100%',
+          textAlign: 'center',
+          cursor: 'pointer',
+          font: '500 10.5px "IBM Plex Mono", monospace',
+          color: 'var(--accent)',
+        }}
+      >
+        see where this lands, plotted → Trends
+      </button>
     </div>
   )
 }
