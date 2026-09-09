@@ -28,3 +28,6 @@ weight_and_cycle_tracker.apk
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase CLI scratch
+supabase/.temp/
