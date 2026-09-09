@@ -70,13 +70,14 @@ export function WeekRow({
   return (
     <div style={{ position: 'relative', marginBottom: 8, borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
       {/* Period marker — absolutely placed so it never perturbs the summary row's flex columns
-          at narrow widths. REVIEW IN SCREENSHOT. */}
+          at narrow widths. left:8 keeps a comfortable gap from the enclosing PhaseCard's inner
+          border while staying left of the date label's 14px inset. REVIEW IN SCREENSHOT. */}
       {hasPeriod && (
         <span
           aria-hidden
           style={{
             position: 'absolute',
-            left: 5,
+            left: 8,
             top: 18,
             width: 4,
             height: 4,
