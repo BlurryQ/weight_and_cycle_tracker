@@ -1,3 +1,10 @@
+// Ported from weight_tracker main:src/components/history/WeekRow.tsx (Neon UX rework), minus
+// its theme overhaul. Fork deltas:
+//  - local formatKcal kept (byte-identical to upstream's lib/format.ts formatKcal; keeps this
+//    port off format.ts, which this branch doesn't own).
+//  - NEW `hasPeriod` prop -> a small --menstrual dot on the collapsed summary row when any day
+//    of the week falls inside a logged period. Absolutely positioned so it can't shift the
+//    flex columns at narrow widths. REVIEW IN SCREENSHOT: dot size / offset vs the date label.
 import { addDays, DAY_NAMES, weekCommencingLabel } from '../../lib/dates'
 import type { NutritionEntry } from '../../lib/energy'
 import { formatWeight, sgn, toDisplay } from '../../lib/format'
@@ -11,8 +18,8 @@ function formatKcal(kcal: number | null | undefined): string {
 }
 
 const SIGN_COLOR: Record<SignColor, string> = {
-  lime: 'var(--cyan)',
-  red: 'var(--red)',
+  lime: 'var(--sign-good)', // +/- deltas stay green/red, independent of the accent hue
+  red: 'var(--sign-bad)',
   grey: 'var(--text-muted)',
 }
 
@@ -24,6 +31,8 @@ interface WeekRowProps {
   hasPrev: boolean
   signColorOf: (v: number) => SignColor
   phase: PhaseAt
+  /** True when any day of this week falls inside a logged period (periodDaysInRange). */
+  hasPeriod: boolean
   open: boolean
   onToggle: () => void
   entries: Entry[]
@@ -46,6 +55,7 @@ export function WeekRow({
   hasPrev,
   signColorOf,
   phase,
+  hasPeriod,
   open,
   onToggle,
   entries,
@@ -58,7 +68,23 @@ export function WeekRow({
   onCopy,
 }: WeekRowProps) {
   return (
-    <div style={{ marginBottom: 8, borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', marginBottom: 8, borderRadius: 14, background: 'var(--surface)', overflow: 'hidden' }}>
+      {/* Period marker — absolutely placed so it never perturbs the summary row's flex columns
+          at narrow widths. REVIEW IN SCREENSHOT. */}
+      {hasPeriod && (
+        <span
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: 5,
+            top: 18,
+            width: 4,
+            height: 4,
+            borderRadius: 999,
+            background: 'var(--menstrual)',
+          }}
+        />
+      )}
       <button
         type="button"
         onClick={onToggle}
@@ -88,22 +114,25 @@ export function WeekRow({
         >
           {formatKcal(weekKcal)}
         </span>
-        {phase.dir && (
+        {/* The enclosing PhaseCard's header already states Cut/Bulk, so a folded one-week
+            Deload/Maintain event is the only thing worth tagging on the row itself — neutral,
+            same as Setup's own Deload/Maintain treatment, since a hold isn't a direction. */}
+        {(phase.raw === 'Deload' || phase.raw === 'Maintain') && (
           <span
             style={{
               font: '600 8.5px/1 "Barlow Condensed", sans-serif',
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: phase.dir === 'Bulk' ? 'var(--blue)' : 'var(--cyan-text)',
+              color: 'var(--tag-neutral)',
             }}
           >
-            {phase.dir}
+            {phase.raw}
           </span>
         )}
         <span style={{ flex: 1, textAlign: 'right', font: '500 11.5px "IBM Plex Mono", monospace', color: hasPrev ? SIGN_COLOR[signColorOf(deltaLbs ?? 0)] : 'var(--text-muted)' }}>
           {hasPrev ? sgn(toDisplay(deltaLbs ?? 0, unit)) : '—'}
         </span>
-        <span style={{ font: '500 9px/1 "IBM Plex Mono", monospace', color: 'var(--text-faint)', width: 14, textAlign: 'right' }}>
+        <span style={{ font: '500 9px/1 "IBM Plex Mono", monospace', color: 'var(--text-disabled)', width: 14, textAlign: 'right' }}>
           {open ? '▾' : '▸'}
         </span>
       </button>
@@ -131,8 +160,8 @@ export function WeekRow({
                 font: '600 9.5px/1 "Barlow Condensed", sans-serif',
                 letterSpacing: '0.1em',
                 textTransform: 'uppercase',
-                color: 'var(--ink-on-accent)',
-                background: 'var(--cyan)',
+                color: 'var(--on-accent)',
+                background: 'var(--accent)',
                 padding: '5px 10px',
                 borderRadius: 999,
                 cursor: 'pointer',
@@ -152,7 +181,7 @@ export function WeekRow({
                 key={date}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}
               >
-                <span style={{ width: 40, font: '500 13px "IBM Plex Mono", monospace', color: isToday ? 'var(--cyan)' : 'var(--text-dim)' }}>
+                <span style={{ width: 40, font: '500 13px "IBM Plex Mono", monospace', color: isToday ? 'var(--accent)' : 'var(--text-dim)' }}>
                   {dn}
                 </span>
                 <span style={{ flex: 1, font: '500 13px "IBM Plex Mono", monospace', color: entry ? 'var(--text-secondary)' : 'var(--text-disabled)' }}>
@@ -167,7 +196,7 @@ export function WeekRow({
                     onClick={() => onEditDay(date)}
                     style={{
                       font: '500 11px "IBM Plex Mono", monospace',
-                      color: 'var(--cyan)',
+                      color: 'var(--accent)',
                       opacity: 0.75,
                       cursor: 'pointer',
                       paddingRight: 10, // matches the Copy pill's own inset so the text lines up

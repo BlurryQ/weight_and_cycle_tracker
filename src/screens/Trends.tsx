@@ -1,121 +1,80 @@
-import { buildChartGeometry } from '../lib/chartGeometry'
-import { fullDate, today as todayIso } from '../lib/dates'
-import { estimateMaintenance, intakeAdjustment, targetIntake } from '../lib/energy'
-import { sgn, toDisplay, toLbs, unitLabel } from '../lib/format'
+// Ported from weight_tracker main:src/screens/Trends.tsx (Neon UX rework), minus its theme
+// overhaul. Fork deltas:
+//  - the two-pass geometry/Reach build lives in buildTrendsChart() (src/screens/today/
+//    trendsChartGeometry.ts) so the Today chart mirror and this screen can't drift.
+//  - SIGN_COLOR uses groundwork's static cyan aliases --sign-good / --sign-bad.
+//  - period-day ticks: periodDaysInRange(cycleLog, t.from, t.to) -> <WeightChart periodDays>.
+import { periodDaysInRange } from '../lib/cycle'
+import { today as todayIso } from '../lib/dates'
+import { sgn, toLbs } from '../lib/format'
 import {
   completionRatio,
-  currentDir,
-  currentStreak,
   fitQualityLabel,
-  foldedWeeks,
-  longestStreak,
-  phaseSpans,
+  hasFoldedWeek,
   signColor,
-  weeklyAverages,
+  type PhaseAnchorMode,
   type SignColor,
 } from '../lib/math'
 import { useApp } from '../store/AppContext'
 import type { TrendWindow } from '../store/types'
 import { WeightChart } from '../components/chart/WeightChart'
+import { ReachCard } from '../components/entry/ReachCard'
 import { SegmentedControl } from '../components/ui/SegmentedControl'
+import { buildTrendsChart } from './today/trendsChartGeometry'
 
 const SIGN_COLOR: Record<SignColor, string> = {
-  lime: 'var(--cyan)',
-  red: 'var(--red)',
+  lime: 'var(--sign-good)', // +/- deltas stay green/red, independent of the accent hue
+  red: 'var(--sign-bad)',
   grey: 'var(--text-muted)',
 }
 
-const WINDOW_OPTIONS: { value: TrendWindow; label: string }[] = [
+const WINDOW_OPTIONS: { value: TrendWindow | 'phase'; label: string }[] = [
   { value: 8, label: '8W' },
   { value: 13, label: '3M' },
   { value: 26, label: '6M' },
   { value: 99, label: 'ALL' },
+  { value: 'phase', label: 'PHASE' },
 ]
 
-// Transitional: trendHorizon was dropped in the groundwork port (upstream couples the chart's
-// forward projection to the Reach solver's solved weeks instead). The trends-history port agent
-// replaces this whole file with upstream's Trends; until then the projection uses a fixed 6-week
-// horizon so the screen still renders.
-const PROJECTION_WEEKS = 6
+const ANCHOR_LABELS: Record<PhaseAnchorMode, string> = {
+  phaseStart: 'this phase',
+  lastDeload: 'last deload',
+  lastMaintain: 'last maintain',
+}
 
-const kcal = (n: number) => Math.round(n).toLocaleString('en-US')
-
-function MaintenanceCard({
-  entries,
-  nutrition,
-  phaseLog,
-  weeklyTargetLbs,
-  today,
+/** A thin single-line anchor picker — appears only while PHASE is the active window segment.
+ * Unavailable anchors (no Deload/Maintain week logged yet) are hidden outright rather than shown
+ * disabled, so the line never reserves space for a toggle that can't do anything. */
+function PhaseAnchorLine({
+  mode,
+  onChange,
+  available,
 }: {
-  entries: Parameters<typeof estimateMaintenance>[0]
-  nutrition: Parameters<typeof estimateMaintenance>[1]
-  phaseLog: Parameters<typeof estimateMaintenance>[2]
-  weeklyTargetLbs: number
-  today: string
+  mode: PhaseAnchorMode
+  onChange: (mode: PhaseAnchorMode) => void
+  available: Record<PhaseAnchorMode, boolean>
 }) {
-  const est = estimateMaintenance(entries, nutrition, phaseLog, today)
+  const anchors = (['phaseStart', 'lastDeload', 'lastMaintain'] as const).filter((a) => available[a])
 
   return (
-    <div style={{ marginTop: 12, padding: '14px 15px', borderRadius: 14, background: 'var(--surface)' }}>
-      <div
-        style={{
-          font: '600 9.5px/1 "Barlow Condensed", sans-serif',
-          letterSpacing: '0.2em',
-          textTransform: 'uppercase',
-          color: 'var(--text-dim)',
-        }}
-      >
-        Energy balance
-      </div>
-
-      {est.maintenance == null ? (
-        <div style={{ marginTop: 10, font: '500 11px/1.5 "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-          {est.note}
-          <br />
-          Maintenance and a calorie target show up once there's enough overlap of weigh-ins and
-          MyFitnessPal days.
-        </div>
-      ) : (
-        <>
-          <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span
-              style={{
-                font: '700 36px/1 "Barlow Condensed", sans-serif',
-                color: est.kind === 'unreliable' ? 'var(--text-dim)' : 'var(--text-primary)',
-              }}
-            >
-              {kcal(est.maintenance)}
-            </span>
-            <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-              cal/day to maintain
-            </span>
-          </div>
-
-          {(() => {
-            const target = targetIntake(est.maintenance, weeklyTargetLbs)
-            const adj = intakeAdjustment(est, weeklyTargetLbs)
-            const rate = `${weeklyTargetLbs > 0 ? '+' : '−'}${Math.abs(weeklyTargetLbs).toFixed(1)} lb/wk`
-            const move =
-              adj == null || Math.abs(adj) < 25
-                ? 'about where you are now'
-                : adj < 0
-                  ? `trim ~${kcal(-adj)}/day from your recent ${kcal(est.meanIntake ?? 0)}`
-                  : `add ~${kcal(adj)}/day to your recent ${kcal(est.meanIntake ?? 0)}`
-            return (
-              <div style={{ marginTop: 8, font: '500 11px/1.6 "IBM Plex Mono", monospace', color: 'var(--text-secondary)' }}>
-                Target {rate} → <strong style={{ color: 'var(--cyan)' }}>{kcal(target)} cal/day</strong>
-                <br />
-                <span style={{ color: 'var(--text-dim)' }}>{move}</span>
-              </div>
-            )
-          })()}
-
-          <div style={{ marginTop: 8, font: '500 9.5px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-            {est.note} · {est.calorieDays} days
-            {est.kind === 'unreliable' ? ' · treat with caution' : ''}
-          </div>
-        </>
-      )}
+    <div style={{ marginTop: 8, display: 'flex', alignItems: 'baseline', gap: 5, lineHeight: '18px', whiteSpace: 'nowrap' }}>
+      <span style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>anchored:</span>
+      {anchors.map((a, i) => (
+        <span key={a} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 5 }}>
+          <button
+            type="button"
+            onClick={() => onChange(a)}
+            style={{
+              cursor: 'pointer',
+              font: mode === a ? '700 10px "IBM Plex Mono", monospace' : '500 10px "IBM Plex Mono", monospace',
+              color: mode === a ? 'var(--accent)' : 'var(--text-dim)',
+            }}
+          >
+            {ANCHOR_LABELS[a]}
+          </button>
+          {i < anchors.length - 1 && <span style={{ color: 'var(--text-dim)' }}>·</span>}
+        </span>
+      ))}
     </div>
   )
 }
@@ -143,33 +102,29 @@ function StatCard({ label, value, color, note }: { label: string; value: string;
 
 export function Trends() {
   const { state, dispatch } = useApp()
-  const { entries, nutrition, phase, phaseLog, unit, trendWindow } = state
+  const { entries, cycleLog, phaseLog, unit, trendWindow, trendWindowMode, solveMode, targetLbs, targetWeeks } = state
   const today = todayIso()
 
-  const weekly = weeklyAverages(entries)
-  const dir = currentDir(phase, phaseLog)
-  const fitK = trendWindow === 99 ? weekly.length : Math.max(4, Math.round(trendWindow / 2))
-  const spans = phaseSpans(phaseLog)
+  const t = buildTrendsChart(state, today, { W: 316, H: 184, gutter: 32, gridN: 5 })
+  const { geometry } = t
 
-  const geometry = buildChartGeometry(
-    weekly,
-    spans,
-    { W: 316, H: 184, gutter: 32, showN: trendWindow, fitK, fwd: PROJECTION_WEEKS, gridN: 5 },
-    (lbs) => toDisplay(lbs, unit),
-    foldedWeeks(phaseLog),
-    state.weeklyTarget,
-  )
+  // Period-day ticks over the chart's visible range (the helper hands back the [from, to] it drew).
+  const periodDays = periodDaysInRange(cycleLog, t.from, t.to)
 
-  const streak = currentStreak(entries, today)
-  const best = longestStreak(entries)
+  const anchorAvailable: Record<PhaseAnchorMode, boolean> = {
+    phaseStart: true,
+    lastDeload: hasFoldedWeek(phaseLog, 'Deload'),
+    lastMaintain: hasFoldedWeek(phaseLog, 'Maintain'),
+  }
+
   // completionRatio already clamps to the first-ever entry, so a big sentinel safely means "all".
-  const completion = completionRatio(entries, trendWindow === 99 ? 9999 : trendWindow, today)
+  // The helper returns raw showN; the 99 -> 9999 "all" sentinel is applied here, as upstream does.
+  const completion = completionRatio(entries, trendWindowMode === 'weeks' && trendWindow === 99 ? 9999 : t.showN, today)
 
-  // geometry.last/first/slope/projVal are already in display units (the chart fits and
-  // projects on converted points — the one deliberate exception to "convert only at the
-  // display boundary"), so these must NOT be run through toDisplay again.
+  // geometry.last/first/slope/projVal are already in display units (the chart fits and projects
+  // on converted points — the one deliberate exception to "convert only at the display
+  // boundary"), so these must NOT be run through toDisplay again.
   const change = geometry.last - geometry.first
-  const projectedDisplay = geometry.line ? geometry.projVal.toFixed(1) : '—'
 
   return (
     <div style={{ padding: '0 20px' }}>
@@ -184,34 +139,31 @@ export function Trends() {
         >
           Trends
         </span>
-        <span style={{ font: '500 10.5px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-          {Math.min(trendWindow, weekly.length)} weeks shown
-        </span>
       </div>
 
-      <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-          <span style={{ font: '700 20px/1 "Barlow Condensed", sans-serif', color: 'var(--cyan)' }}>{streak}</span>
-          <span style={{ font: '500 9px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-            day{streak === 1 ? '' : 's'} streak
-          </span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-          <span style={{ font: '700 20px/1 "Barlow Condensed", sans-serif', color: 'var(--text-secondary)' }}>{best}</span>
-          <span style={{ font: '500 9px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>best</span>
-        </div>
-        <span style={{ marginLeft: 'auto', font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)', textAlign: 'right' }}>
-          {completion.logged}/{completion.possible} days
-          <br />
-          {completion.label}
-        </span>
+      <div style={{ marginTop: 10, font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
+        {completion.logged}/{completion.possible} days · {completion.label}
+      </div>
+
+      <ReachCard
+        unit={unit}
+        solveMode={solveMode}
+        onSolveModeChange={(mode) => dispatch({ type: 'SET_SOLVE_MODE', mode })}
+        targetLbs={targetLbs}
+        targetWeeks={targetWeeks}
+        onEditTarget={() => dispatch({ type: 'OPEN_SHEET', sheet: 'target' })}
+        onWeeksChange={(weeks) => dispatch({ type: 'SET_TARGET_WEEKS', value: weeks })}
+        current={t.current}
+        slopeLbs={toLbs(geometry.slope, unit)}
+        weightResult={t.weightResult}
+        dateResult={t.dateResult}
+      />
+
+      <div style={{ marginTop: 20 }}>
+        <WeightChart geometry={geometry} W={316} H={184} gutter={32} variant="trends" periodDays={periodDays} />
       </div>
 
       <div style={{ marginTop: 20 }}>
-        <WeightChart geometry={geometry} W={316} H={184} gutter={32} variant="trends" />
-      </div>
-
-      <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span
           style={{
             font: '600 9.5px/1 "Barlow Condensed", sans-serif',
@@ -222,56 +174,44 @@ export function Trends() {
         >
           Window
         </span>
-        <SegmentedControl value={trendWindow} onChange={(window) => dispatch({ type: 'SET_TREND_WINDOW', window })} options={WINDOW_OPTIONS} />
       </div>
 
+      <div style={{ marginTop: 8 }}>
+        <SegmentedControl
+          size="lg"
+          value={trendWindowMode === 'weeks' ? trendWindow : 'phase'}
+          onChange={(picked) => {
+            if (picked === 'phase') {
+              // Clicking PHASE while it's already the active segment leaves whichever anchor was
+              // picked alone — only a fresh weeks -> phase transition needs a default.
+              if (trendWindowMode === 'weeks') dispatch({ type: 'SET_TREND_WINDOW_MODE', mode: 'phaseStart' })
+            } else {
+              dispatch({ type: 'SET_TREND_WINDOW_MODE', mode: 'weeks' })
+              dispatch({ type: 'SET_TREND_WINDOW', window: picked })
+            }
+          }}
+          options={WINDOW_OPTIONS}
+        />
+      </div>
+
+      {/* Collapses away entirely (no reserved space) outside PHASE mode. */}
+      {trendWindowMode !== 'weeks' && (
+        <PhaseAnchorLine
+          mode={trendWindowMode}
+          onChange={(mode) => dispatch({ type: 'SET_TREND_WINDOW_MODE', mode })}
+          available={anchorAvailable}
+        />
+      )}
+
       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-        <StatCard label="Change" value={sgn(change)} color={SIGN_COLOR[signColor(toLbs(change, unit), dir)]} />
+        <StatCard label="Change" value={sgn(change)} color={SIGN_COLOR[signColor(toLbs(change, unit), t.dir)]} />
         <StatCard
           label="Fit slope"
           value={sgn(geometry.slope, 2) + '/wk'}
-          color={SIGN_COLOR[signColor(toLbs(geometry.slope, unit), dir)]}
+          color={SIGN_COLOR[signColor(toLbs(geometry.slope, unit), t.dir)]}
         />
         <StatCard label="R²" value={geometry.r2.toFixed(2)} note={fitQualityLabel(geometry.r2)} />
       </div>
-
-      <div style={{ marginTop: 12, padding: '14px 15px', borderRadius: 14, background: 'var(--surface)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span
-            style={{
-              font: '600 9.5px/1 "Barlow Condensed", sans-serif',
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--text-dim)',
-            }}
-          >
-            If this continues
-          </span>
-          <span style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-            {PROJECTION_WEEKS}W
-          </span>
-        </div>
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ font: '700 36px/1 "Barlow Condensed", sans-serif', color: 'var(--text-primary)' }}>
-            {projectedDisplay}
-          </span>
-          <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-            {unitLabel(unit)} by {fullDate(geometry.projDate || today)}
-          </span>
-        </div>
-        <div style={{ marginTop: 6, font: '500 10px/1.5 "IBM Plex Mono", monospace', color: 'var(--text-dim)' }}>
-          Fit over the last {geometry.fitWeeks} weeks, R² {geometry.r2.toFixed(2)}. Target{' '}
-          {sgn(toDisplay(state.weeklyTarget, unit), 2)} {unitLabel(unit)}/wk.
-        </div>
-      </div>
-
-      <MaintenanceCard
-        entries={entries}
-        nutrition={nutrition}
-        phaseLog={phaseLog}
-        weeklyTargetLbs={state.weeklyTarget}
-        today={today}
-      />
     </div>
   )
 }
