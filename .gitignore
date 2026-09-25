@@ -31,3 +31,6 @@ weight_and_cycle_tracker.apk
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# apks
+*.apk
