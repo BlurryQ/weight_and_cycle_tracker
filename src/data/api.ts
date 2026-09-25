@@ -1,6 +1,7 @@
 import type { Entry, PhaseLogEntry } from '../lib/math'
 import type { CycleLogEntry } from '../lib/cycle'
 import type { NutritionEntry } from '../lib/energy'
+import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase, supabaseConfigured } from './supabaseClient'
 import type { SettingsPayload } from './queue'
 
@@ -17,47 +18,76 @@ async function requireSession() {
   return data.session
 }
 
+// Supabase/PostgREST caps an unranged select at a project-configured max-rows (commonly 1000).
+// Ordered ascending with no explicit range, an oversized table would silently come back
+// truncated to its *oldest* rows — the newest entries (today's weigh-in included) would just
+// vanish from the app with no error. Paginating explicitly makes fetchAll correct regardless of
+// table size or that project setting, rather than depending on staying under it forever.
+const FETCH_PAGE_SIZE = 1000
+
+async function fetchAllRows<T>(table: string, columns: string, orderColumn: string): Promise<T[]> {
+  const rows: T[] = []
+  for (let offset = 0; ; offset += FETCH_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .order(orderColumn, { ascending: true })
+      .range(offset, offset + FETCH_PAGE_SIZE - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    rows.push(...(data as T[]))
+    if (data.length < FETCH_PAGE_SIZE) break
+  }
+  return rows
+}
+
+/** supabase-js returns the HTTP status beside the error, not on it; sync.ts needs it to tell a
+ * permanently rejected write (4xx) from a transient one, so carry it on the thrown error. */
+function fail(error: PostgrestError, status: number): never {
+  throw Object.assign(error, { status })
+}
+
 export async function upsertEntry(date: string, lbs: number): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('entries').upsert({ date, lbs }, { onConflict: 'user_id,date' })
-  if (error) throw error
+  const { error, status } = await supabase.from('entries').upsert({ date, lbs }, { onConflict: 'user_id,date' })
+  if (error) fail(error, status)
 }
 
 export async function deleteEntry(date: string): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('entries').delete().eq('date', date)
-  if (error) throw error
+  const { error, status } = await supabase.from('entries').delete().eq('date', date)
+  if (error) fail(error, status)
 }
 
 export async function upsertDailyNutrition(date: string, kcal: number): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase
+  const { error, status } = await supabase
     .from('daily_nutrition')
     .upsert({ date, kcal }, { onConflict: 'user_id,date' })
-  if (error) throw error
+  if (error) fail(error, status)
 }
 
 export async function upsertPhaseLogEntry(start: string, name: PhaseLogEntry['name']): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('phase_log').upsert({ start, name }, { onConflict: 'user_id,start' })
-  if (error) throw error
+  const { error, status } = await supabase.from('phase_log').upsert({ start, name }, { onConflict: 'user_id,start' })
+  if (error) fail(error, status)
 }
 
 export async function upsertCycleLogEntry(start: string, end: string | null): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('cycle_log').upsert({ start, end_date: end }, { onConflict: 'user_id,start' })
-  if (error) throw error
+  const { error, status } = await supabase.from('cycle_log').upsert({ start, end_date: end }, { onConflict: 'user_id,start' })
+  if (error) fail(error, status)
 }
 
 export async function deleteCycleLogEntry(start: string): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('cycle_log').delete().eq('start', start)
-  if (error) throw error
+  const { error, status } = await supabase.from('cycle_log').delete().eq('start', start)
+  if (error) fail(error, status)
 }
 
 export async function upsertSettings(settings: SettingsPayload): Promise<void> {
   if (!supabaseConfigured) return
-  const { error } = await supabase.from('settings').upsert(
+  const { error, status } = await supabase.from('settings').upsert(
     {
       phase: settings.phase,
       phase_start: settings.phaseStart,
@@ -72,7 +102,7 @@ export async function upsertSettings(settings: SettingsPayload): Promise<void> {
     },
     { onConflict: 'user_id' },
   )
-  if (error) throw error
+  if (error) fail(error, status)
 }
 
 /** Fetches entries + phase log + settings in parallel. Returns null if not configured or not
@@ -82,17 +112,13 @@ export async function fetchAll(): Promise<RemoteSnapshot | null> {
   const session = await requireSession()
   if (!session) return null
 
-  const [entriesRes, nutritionRes, phaseLogRes, cycleLogRes, settingsRes] = await Promise.all([
-    supabase.from('entries').select('date, lbs').order('date', { ascending: true }),
-    supabase.from('daily_nutrition').select('date, kcal').order('date', { ascending: true }),
-    supabase.from('phase_log').select('start, name').order('start', { ascending: true }),
-    supabase.from('cycle_log').select('start, end_date').order('start', { ascending: true }),
+  const [entryRows, nutritionRows, phaseLogRows, cycleLogRows, settingsRes] = await Promise.all([
+    fetchAllRows<{ date: string; lbs: number }>('entries', 'date, lbs', 'date'),
+    fetchAllRows<{ date: string; kcal: number }>('daily_nutrition', 'date, kcal', 'date'),
+    fetchAllRows<{ start: string; name: PhaseLogEntry['name'] }>('phase_log', 'start, name', 'start'),
+    fetchAllRows<{ start: string; end_date: string | null }>('cycle_log', 'start, end_date', 'start'),
     supabase.from('settings').select('*').maybeSingle(),
   ])
-  if (entriesRes.error) throw entriesRes.error
-  if (nutritionRes.error) throw nutritionRes.error
-  if (phaseLogRes.error) throw phaseLogRes.error
-  if (cycleLogRes.error) throw cycleLogRes.error
   if (settingsRes.error) throw settingsRes.error
 
   const settingsRow = settingsRes.data
@@ -112,10 +138,10 @@ export async function fetchAll(): Promise<RemoteSnapshot | null> {
     : null
 
   return {
-    entries: (entriesRes.data ?? []).map((r) => ({ date: r.date, lbs: r.lbs })),
-    nutrition: (nutritionRes.data ?? []).map((r) => ({ date: r.date, kcal: r.kcal })),
-    phaseLog: (phaseLogRes.data ?? []).map((r) => ({ start: r.start, name: r.name })),
-    cycleLog: (cycleLogRes.data ?? []).map((r) => ({ start: r.start, ...(r.end_date ? { end: r.end_date } : {}) })),
+    entries: entryRows.map((r) => ({ date: r.date, lbs: r.lbs })),
+    nutrition: nutritionRows.map((r) => ({ date: r.date, kcal: r.kcal })),
+    phaseLog: phaseLogRows.map((r) => ({ start: r.start, name: r.name })),
+    cycleLog: cycleLogRows.map((r) => ({ start: r.start, ...(r.end_date ? { end: r.end_date } : {}) })),
     settings,
   }
 }

@@ -45,6 +45,8 @@ export interface UiState {
   toast: string | null
   /** Set when the last sync attempt failed and writes remain queued. */
   syncFailed: boolean
+  /** Set when the last attempt to pull the remote snapshot failed (network, auth, RLS...). */
+  pullFailed: boolean
   /** True once the initial local/remote hydration has completed. */
   hydrated: boolean
   /** A phase tapped on Setup's grid but not yet committed — STAGE_PHASE sets this,
@@ -98,6 +100,7 @@ export function initialState(): AppState {
     openWeek: null,
     toast: null,
     syncFailed: false,
+    pullFailed: false,
     hydrated: false,
     pendingPhase: null,
     phaseUndo: null,

@@ -10,6 +10,7 @@ import {
   weeklyAverages,
 } from '../lib/math'
 import { cycleDayToday, medianCycleLength, type CyclePhase } from '../lib/cycle'
+import { deadLetterCount } from '../data/queue'
 import { useApp } from '../store/AppContext'
 import { Chip } from '../components/ui/Chip'
 import { ReachCard } from '../components/entry/ReachCard'
@@ -61,8 +62,19 @@ export function Today() {
     solveMode,
     targetLbs,
     targetWeeks,
+    syncFailed,
+    pullFailed,
   } = state
   const today = todayIso()
+  const stuck = deadLetterCount()
+  const syncBad = syncFailed || pullFailed || stuck > 0
+  const syncMessage = pullFailed
+    ? "Couldn't load from the server — showing this device's copy"
+    : stuck > 0
+      ? `${stuck} change${stuck === 1 ? '' : 's'} rejected by the server`
+      : syncFailed
+        ? 'Changes saved on this device, not yet synced'
+        : 'Synced'
   const cyc = cycleDayToday(cycleLog, today, medianCycleLength(cycleLog))
 
   if (entries.length === 0) {
@@ -131,8 +143,25 @@ export function Today() {
             onClick={() => dispatch({ type: 'SET_SCREEN', screen: 'cycle' })}
           />
         )}
-        <span style={{ marginLeft: 'auto', font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-faint)' }}>
-          {shortDate(today)}
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            aria-label={syncMessage}
+            title={syncMessage}
+            onClick={() => dispatch({ type: 'SHOW_TOAST', message: syncMessage })}
+            style={{ padding: 4, margin: -4, background: 'none', border: 0, cursor: 'pointer', display: 'inline-flex' }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: syncBad ? 'var(--sign-bad)' : 'var(--sign-good)',
+                display: 'inline-block',
+              }}
+            />
+          </button>
+          <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-faint)' }}>{shortDate(today)}</span>
         </span>
       </div>
 

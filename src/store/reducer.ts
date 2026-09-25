@@ -43,6 +43,7 @@ export type Action =
   | { type: 'CLEAR_TOAST' }
   | { type: 'HYDRATE'; state: Partial<PersistedState> }
   | { type: 'SET_SYNC_FAILED'; failed: boolean }
+  | { type: 'SET_PULL_FAILED'; failed: boolean }
 
 function withPhaseLogAppend(phaseLog: AppState['phaseLog'], start: string, name: PhaseName) {
   return dedupePhaseLog([...phaseLog, { start, name }])
@@ -248,6 +249,9 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'SET_SYNC_FAILED':
       return { ...state, syncFailed: action.failed }
+
+    case 'SET_PULL_FAILED':
+      return { ...state, pullFailed: action.failed }
 
     default:
       return state
