@@ -150,6 +150,39 @@ describe('buildCycleSpans', () => {
   })
 })
 
+describe('buildCycleSpans — overdue period', () => {
+  // Last start 35 days before TODAY with a 29-day median: the expected start (2026-08-18) passed
+  // a week ago and nothing has been logged since.
+  const log = startsBack([29, 28, 30, 27, 31, 29], '2026-07-24')
+  const s = buildCycleSpans(log, '2026-07-01', '2026-12-01', TODAY, 29)
+  const cur = s.filter((x) => x.start >= '2026-07-24')
+
+  it('agrees with the status card: today is Luteal', () => {
+    expect(cycleDayToday(log, TODAY, 29)!.phase).toBe('Luteal')
+    const todaySpan = s.find((x) => x.start <= TODAY && x.end >= TODAY)!
+    expect(todaySpan.name).toBe('Luteal')
+  })
+
+  it('prolongs luteal to the chart edge with no projected period after it', () => {
+    expect(cur.map((x) => x.name)).toEqual(['Menstrual', 'Follicular', 'Ovulation', 'Luteal', 'Luteal'])
+    expect(cur[cur.length - 1].end).toBe(addDays(TODAY, 14))
+  })
+
+  it('keeps ovulation where the median cycle puts it', () => {
+    const median = buildCycleSpans([{ start: '2026-07-24' }], '2026-07-01', '2026-08-10', '2026-08-10', 29)
+    const ov = (xs: typeof s) => xs.find((x) => x.name === 'Ovulation' && x.start >= '2026-07-24')
+    expect(ov(cur)).toBeDefined()
+    expect(ov(cur)).toEqual(ov(median))
+  })
+
+  it('splits the prolonged luteal at today: confirmed up to it, predicted after', () => {
+    const [a, b] = cur.slice(-2)
+    expect(a).toMatchObject({ end: TODAY, predicted: false })
+    expect(b).toMatchObject({ start: addDays(TODAY, 1), predicted: true })
+    for (let i = 1; i < s.length; i++) expect(s[i].start).toBe(addDays(s[i - 1].end, 1))
+  })
+})
+
 describe('cycleDayToday', () => {
   it('returns null before anything is logged', () => {
     expect(cycleDayToday([], TODAY)).toBeNull()

@@ -180,9 +180,13 @@ export function Cycle() {
             </div>
             <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 7 }}>
               <span style={{ font: '700 46px/0.85 "Barlow Condensed", sans-serif', color: 'var(--text-primary)' }}>
-                {Math.max(0, ct.daysToNext)}
+                {Math.abs(ct.daysToNext)}
               </span>
-              <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-muted)' }}>days to next period</span>
+              <span style={{ font: '500 11px "IBM Plex Mono", monospace', color: 'var(--text-muted)' }}>
+                {ct.daysToNext < 0
+                  ? `day${ct.daysToNext === -1 ? '' : 's'} late`
+                  : `day${ct.daysToNext === 1 ? '' : 's'} to next period`}
+              </span>
             </div>
           </div>
           <span style={{ font: '500 10px "IBM Plex Mono", monospace', color: 'var(--text-dim)', textAlign: 'right' }}>

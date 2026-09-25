@@ -27,6 +27,9 @@ export interface Cycle {
   len: number
   end?: string
   projected: boolean // true for cycles synthesised past the last logged start
+  /** Set on an overdue current cycle (see buildCycles): phase boundaries stay on this length,
+   * and the luteal phase runs on for the rest of `len`. */
+  phaseLen?: number
 }
 
 const DEFAULT_LEN = 28
@@ -130,8 +133,14 @@ function clamp(v: number, lo: number, hi: number): number {
 
 /** Walks the logged starts, back-fills earlier cycles to cover `from`, and projects forward
  * past the last logged start using `medianLen`. Lengths between two logged starts are the real
- * gap; everything else is `medianLen`. */
-export function buildCycles(log: CycleLogEntry[], from: string, to: string, medianLen: number): Cycle[] {
+ * gap; everything else is `medianLen`.
+ *
+ * With `today`, an overdue current cycle (its expected next start has passed with no period
+ * logged) is not followed by a projected one: the period hasn't come, so the body is still in
+ * the luteal phase. That cycle instead runs to `to`, with its phase boundaries kept on
+ * `medianLen` (so ovulation doesn't shift later) and only the luteal phase prolonged. Matches
+ * cycleDayToday, which holds an overdue day at Luteal. */
+export function buildCycles(log: CycleLogEntry[], from: string, to: string, medianLen: number, today?: string): Cycle[] {
   const starts = sortedStarts(log)
   const endByStart = new Map(log.map((l) => [l.start, l.end]))
   const cycles: Cycle[] = []
@@ -166,8 +175,15 @@ export function buildCycles(log: CycleLogEntry[], from: string, to: string, medi
     cycles.push({ start: s, len, end: endByStart.get(s) ?? undefined, projected: i + 1 >= starts.length })
   }
 
-  // Project forward past the last logged start.
-  let s = addDays(starts[starts.length - 1], medianLen)
+  // Project forward past the last logged start — unless that cycle is already overdue.
+  const last = starts[starts.length - 1]
+  let s = addDays(last, medianLen)
+  if (today && s <= today) {
+    const cur = cycles[cycles.length - 1]
+    cur.len = Math.max(medianLen, diffDays(last, to) + 1)
+    cur.phaseLen = medianLen
+    return cycles
+  }
   while (s <= to) {
     cycles.push({ start: s, len: medianLen, projected: true })
     s = addDays(s, medianLen)
@@ -188,7 +204,7 @@ export function buildCycleSpans(
   medianLen = medianCycleLength(log),
 ): CycleSpan[] {
   const cap = minDate(to, addDays(today, FORWARD_DAYS))
-  const cycles = buildCycles(log, from, cap, medianLen)
+  const cycles = buildCycles(log, from, cap, medianLen, today)
   const spans: CycleSpan[] = []
 
   for (const c of cycles) {
@@ -211,15 +227,28 @@ export function buildCycleSpans(
     }
 
     const endOffset = c.end ? diffDays(c.start, c.end) : undefined
-    for (const r of phaseRanges(c.len, endOffset)) {
-      const spanStart = addDays(c.start, r.from)
-      const spanEnd = addDays(c.start, r.to)
-      if (spanEnd < from || spanStart > cap) continue
+    const ranges = phaseRanges(c.phaseLen ?? c.len, endOffset)
+    // Overdue cycle: stretch the luteal range over the extra days, split at today so the part
+    // past today is still drawn as a prediction.
+    const pieces: { name: CyclePhase; from: string; to: string }[] = []
+    for (const r of ranges) pieces.push({ name: r.name, from: addDays(c.start, r.from), to: addDays(c.start, r.to) })
+    if (c.phaseLen != null) {
+      const lut = pieces[pieces.length - 1]
+      const extendedEnd = addDays(c.start, c.len - 1)
+      if (lut.to < today && extendedEnd > today) {
+        lut.to = today
+        pieces.push({ name: lut.name, from: addDays(today, 1), to: extendedEnd })
+      } else {
+        lut.to = extendedEnd
+      }
+    }
+    for (const r of pieces) {
+      if (r.to < from || r.from > cap) continue
       spans.push({
         name: r.name,
-        start: maxDate(spanStart, from),
-        end: minDate(spanEnd, cap),
-        predicted: spanStart > today,
+        start: maxDate(r.from, from),
+        end: minDate(r.to, cap),
+        predicted: r.from > today,
       })
     }
   }
