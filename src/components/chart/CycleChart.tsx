@@ -14,9 +14,10 @@ const PHASE_VAR: Record<CyclePhase, string> = {
   Luteal: '--luteal',
 }
 // Solid-phase-token opacities for the shaded bands: confirmed bands vs. predicted (future) bands.
-// Below ~30% the tints collapse on --bg (amber reads olive, luteal reads navy-grey, menstrual and
-// ovulation both read maroon), so the bands stop matching the legend swatches. Luteal is the
-// darkest, lowest-chroma token, so it needs the most to hold its hue.
+// Below ~30% the tints collapse on --bg (luteal reads navy-grey, menstrual and ovulation both
+// read maroon), so the bands stop matching the legend swatches. Luteal is the darkest,
+// lowest-chroma token, so it needs the most to hold its hue. (Follicular used to need the same
+// care as a yellow/amber — it's a true green now, see index.css, so it holds up fine.)
 const BAND_ALPHA: Record<CyclePhase, number> = { Menstrual: 36, Follicular: 30, Ovulation: 34, Luteal: 44 }
 const PRED_ALPHA: Record<CyclePhase, number> = { Menstrual: 18, Follicular: 16, Ovulation: 18, Luteal: 22 }
 

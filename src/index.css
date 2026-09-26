@@ -35,7 +35,11 @@
 
   /* Cycle phases */
   --menstrual: oklch(0.66 0.17 12);
-  --follicular: oklch(0.78 0.12 72);
+  /* Was hue 72 (amber/yellow) — at the low alpha the chart bands use it read as olive/green,
+     inconsistent with the solid amber the legend/table/chips showed at full opacity. Rather than
+     keep tuning band alpha to hold a hue that only degrades further down the lightness/chroma
+     scale, moved the token itself to a true green (hue 145) so every surface agrees. */
+  --follicular: oklch(0.78 0.12 145);
   --ovulation: oklch(0.74 0.16 330);
   --luteal: oklch(0.62 0.11 295);
 
