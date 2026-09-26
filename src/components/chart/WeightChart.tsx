@@ -35,14 +35,20 @@ export function WeightChart({ geometry: g, W, H, gutter, variant, periodDays }: 
 
   // Map each period day to an x on the same axis the weekly points sit on. The shown weekly
   // points span indices 0..(weeks-1), and X(i) = i * lastX / (weeks-1) holds for fractional i
-  // too, so a mid-week day lands between its neighbouring dots. Days outside the drawn data
-  // window (before the first shown week, or in the forward-projection zone) are dropped.
+  // too, so a mid-week day lands between its neighbouring dots — by interpolating between that
+  // day's own week and the *next* week's point. The last shown week has no next point to
+  // interpolate toward, so any day in it past its own Monday (today included) computes past
+  // span; clamp those to the chart's rightmost x instead of dropping them, or a period logged
+  // this week never shows a tick until next week's average lands. Days genuinely before the
+  // drawn window (idx < 0) are still dropped — periodDays is already bounded to the shown
+  // range by its callers, so that's the only other out-of-bounds case.
   const periodTicks: number[] = []
   if (periodDays && periodDays.size && g.weeks > 1) {
     const span = g.weeks - 1
     for (const iso of periodDays) {
-      const idx = span - diffDays(iso, g.lastMonday) / 7
-      if (idx < 0 || idx > span) continue
+      const raw = span - diffDays(iso, g.lastMonday) / 7
+      if (raw < 0) continue
+      const idx = Math.min(span, raw)
       periodTicks.push((idx / span) * g.lastX)
     }
   }
